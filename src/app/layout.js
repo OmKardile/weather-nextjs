@@ -1,7 +1,7 @@
 import './globals.css'
 import { Rajdhani } from 'next/font/google'
 
-const railway = Rajdhani({
+const rajdhani = Rajdhani({
   weight: ['400', '700'],
   style: ['normal'],
   subsets: ['latin'],
@@ -16,7 +16,7 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={railway.className}>{children}</body>
+      <body className={rajdhani.className}>{children}</body>
     </html>
   )
 }
