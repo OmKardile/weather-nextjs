@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { WeatherIcon } from '@/components/weather/WeatherIcon';
+import { ShareCardButton } from '@/components/weather/ShareCardButton';
 import { formatLocalClock, formatLocalDate } from '@/lib/time';
 import { compassPoint, countryFlag, displayTemp, formatHour, formatTemp, formatWind } from '@/lib/units';
 import { conditionLabel } from '@/lib/wmo';
@@ -109,6 +110,7 @@ export function CurrentWeather({
         </div>
 
         <div className="flex items-center gap-2">
+          <ShareCardButton city={city} data={data} units={units} />
           <button
             type="button"
             onClick={onToggleSave}

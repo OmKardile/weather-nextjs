@@ -1,0 +1,61 @@
+/* ================================================================== */
+/* Sky & Time Machine chip tones                                        */
+/*                                                                     */
+/* One class per tone sets --sky-ink; .sky-chip turns it into a tinted */
+/* pill. Inks flip under [data-surface='light'] (same approach as      */
+/* alerts.css) so amber/teal text keeps AA contrast on frosted-white   */
+/* surfaces. Bars, strips and moon discs are decorative and keep their */
+/* naturalistic colors on both surfaces.                                */
+/* ================================================================== */
+
+.sky-chip {
+  color: var(--sky-ink, var(--surface-muted));
+  background: color-mix(in srgb, var(--sky-ink, var(--surface-muted)) 15%, transparent);
+}
+
+/* Stargazing verdicts */
+.sky-tone-excellent {
+  --sky-ink: #45d1b3;
+}
+.sky-tone-good {
+  --sky-ink: #74dcc2;
+}
+.sky-tone-fair {
+  --sky-ink: #e8c54d;
+}
+.sky-tone-poor {
+  --sky-ink: #f0954a;
+}
+
+/* Time machine badge */
+.sky-tone-warm {
+  --sky-ink: #f2b75c;
+}
+.sky-tone-cool {
+  --sky-ink: #45d1b3;
+}
+
+/* Golden / blue hour countdown */
+.sky-tone-golden {
+  --sky-ink: #f2b75c;
+}
+.sky-tone-bluehour {
+  --sky-ink: #8fb6da;
+}
+
+[data-surface='light'] .sky-tone-excellent,
+[data-surface='light'] .sky-tone-good,
+[data-surface='light'] .sky-tone-cool {
+  --sky-ink: #0e6b57;
+}
+[data-surface='light'] .sky-tone-fair {
+  --sky-ink: #7a600c;
+}
+[data-surface='light'] .sky-tone-poor,
+[data-surface='light'] .sky-tone-warm,
+[data-surface='light'] .sky-tone-golden {
+  --sky-ink: #9a5a16;
+}
+[data-surface='light'] .sky-tone-bluehour {
+  --sky-ink: #3d6390;
+}

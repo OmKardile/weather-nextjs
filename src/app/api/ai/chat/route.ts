@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { AiStreamEvent } from '@/types/ai';
+import { AI_VOICE_IDS } from '@/types/ai';
 import {
   NoProviderError,
   aiErrorResponse,
@@ -25,6 +26,7 @@ const payloadSchema = z.object({
     longitude: z.number().min(-180).max(180),
   }),
   units: z.enum(['metric', 'imperial']).default('metric'),
+  voice: z.enum(AI_VOICE_IDS).default('pro'),
   messages: z
     .array(
       z.object({
@@ -49,7 +51,7 @@ export async function POST(req: Request) {
     return aiErrorResponse('Invalid request.', 400);
   }
 
-  const { city, units } = payload;
+  const { city, units, voice } = payload;
   const signal = requestSignal(req);
 
   // Sanitize + cap every turn; keep the last 8 for context.
@@ -81,7 +83,7 @@ export async function POST(req: Request) {
     let provider: string | null = null;
     try {
       for await (const part of streamText({
-        system: chatSystemPrompt(context, city.name),
+        system: chatSystemPrompt(context, city.name, voice),
         user,
         maxOutputTokens: 700,
         temperature: 0.6,

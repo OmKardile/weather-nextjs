@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { readNdjsonStream } from '@/components/ai/ai-shared';
-import type { AiProvider, AiStreamEvent } from '@/types/ai';
+import type { AiProvider, AiStreamEvent, AiVoiceId } from '@/types/ai';
 import type { City, Units } from '@/types/weather';
 
 /* ================================================================== */
@@ -21,6 +21,8 @@ export interface UseAiChatOptions {
   /** City the conversation is grounded in. `send` is a no-op without one. */
   city: City | null;
   units: Units;
+  /** AI persona id — tone only. Defaults to 'pro' server-side. */
+  voice?: AiVoiceId;
 }
 
 export interface UseAiChatResult {
@@ -98,7 +100,7 @@ export function useAiChat(options?: UseAiChatOptions): UseAiChatResult {
     (history: UiChatMessage[]) => {
       const context = contextRef.current;
       if (!context?.city) return;
-      const { city, units } = context;
+      const { city, units, voice } = context;
       const assistantId = newId();
       const epoch = epochRef.current;
       const controller = new AbortController();
@@ -141,6 +143,7 @@ export function useAiChat(options?: UseAiChatOptions): UseAiChatResult {
                 longitude: city.longitude,
               },
               units,
+              voice: voice ?? 'pro',
               messages: history
                 .slice(-MAX_TURNS)
                 .map((message) => ({ role: message.role, content: message.content })),

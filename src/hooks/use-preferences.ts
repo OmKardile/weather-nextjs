@@ -2,6 +2,14 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import type { AiVoiceId } from '@/types/ai';
+import { AI_VOICE_IDS } from '@/types/ai';
+import {
+  DEFAULT_SECTION_ORDER,
+  normalizeHiddenSections,
+  normalizeSectionOrder,
+} from '@/lib/sections';
+import type { SectionId } from '@/lib/sections';
 import type { City, Units } from '@/types/weather';
 
 const MAX_SAVED_CITIES = 8;
@@ -9,14 +17,47 @@ const MAX_SAVED_CITIES = 8;
 /** Theme preference: 'auto' follows the scene's surface, others force it. */
 export type ThemeMode = 'auto' | 'light' | 'dark';
 
+/** Daily-forecast horizon: 7 days by default, 16 when the user opts in. */
+export type ForecastDays = 7 | 16;
+
+/** Forecast-section spacing: roomy default vs tighter information density. */
+export type Density = 'comfortable' | 'compact';
+
+/** Accent presets — shift the aurora hue (CSS var overrides in globals.css). */
+export type Accent = 'aurora' | 'sky' | 'sunset' | 'meadow';
+
 interface PreferencesState {
   units: Units;
   theme: ThemeMode;
+  forecastDays: ForecastDays;
+  /** AI persona — tone only, applied to briefing/chat/story/planner text. */
+  aiVoice: AiVoiceId;
+  /** Synthesized ambient sound — off by default, started by a user gesture. */
+  ambientSoundEnabled: boolean;
+  /** 0…1 master volume for the ambient engine. */
+  ambientVolume: number;
+  /** User's card order (ids from lib/sections). */
+  sectionOrder: SectionId[];
+  /** Hidden card ids (restoreable from Settings). */
+  hiddenSections: SectionId[];
+  /** Forecast-section spacing. */
+  density: Density;
+  /** Aurora hue preset. */
+  accent: Accent;
   savedCities: City[];
   lastCity: City | null;
   setUnits: (units: Units) => void;
   toggleUnits: () => void;
   setTheme: (theme: ThemeMode) => void;
+  setAiVoice: (voice: AiVoiceId) => void;
+  setForecastDays: (days: ForecastDays) => void;
+  setAmbientSoundEnabled: (enabled: boolean) => void;
+  setAmbientVolume: (volume: number) => void;
+  setSectionOrder: (order: SectionId[]) => void;
+  toggleSectionHidden: (id: SectionId) => void;
+  restoreAllSections: () => void;
+  setDensity: (density: Density) => void;
+  setAccent: (accent: Accent) => void;
   saveCity: (city: City) => void;
   removeCity: (id: number) => void;
   isSaved: (id: number) => boolean;
@@ -33,6 +74,14 @@ export const usePreferences = create<PreferencesState>()(
     (set, get) => ({
       units: 'metric',
       theme: 'auto',
+      forecastDays: 7,
+      aiVoice: 'pro',
+      ambientSoundEnabled: false,
+      ambientVolume: 0.5,
+      sectionOrder: [...DEFAULT_SECTION_ORDER],
+      hiddenSections: [],
+      density: 'comfortable',
+      accent: 'aurora',
       savedCities: [],
       lastCity: null,
 
@@ -41,6 +90,29 @@ export const usePreferences = create<PreferencesState>()(
         set((state) => ({ units: state.units === 'metric' ? 'imperial' : 'metric' })),
 
       setTheme: (theme) => set({ theme }),
+
+      setAiVoice: (voice) => set({ aiVoice: voice }),
+
+      setForecastDays: (days) => set({ forecastDays: days }),
+
+      setAmbientSoundEnabled: (enabled) => set({ ambientSoundEnabled: enabled }),
+
+      setAmbientVolume: (volume) => set({ ambientVolume: Math.min(1, Math.max(0, volume)) }),
+
+      setSectionOrder: (order) => set({ sectionOrder: normalizeSectionOrder(order) }),
+
+      toggleSectionHidden: (id) =>
+        set((state) => ({
+          hiddenSections: state.hiddenSections.includes(id)
+            ? state.hiddenSections.filter((section) => section !== id)
+            : [...state.hiddenSections, id],
+        })),
+
+      restoreAllSections: () => set({ hiddenSections: [] }),
+
+      setDensity: (density) => set({ density }),
+
+      setAccent: (accent) => set({ accent }),
 
       saveCity: (city) =>
         set((state) =>
@@ -59,8 +131,32 @@ export const usePreferences = create<PreferencesState>()(
     { name: 'aether-preferences', version: 2, merge: (persisted, current) => ({
       ...current,
       ...(persisted as Partial<PreferencesState> | undefined),
-      // New fields keep their defaults when upgrading from v1 persisted state.
+      // New fields keep their defaults when upgrading from older persisted state.
       theme: (persisted as { theme?: ThemeMode } | undefined)?.theme ?? current.theme,
+      aiVoice: AI_VOICE_IDS.includes((persisted as { aiVoice?: AiVoiceId } | undefined)?.aiVoice as AiVoiceId)
+        ? ((persisted as { aiVoice?: AiVoiceId }).aiVoice as AiVoiceId)
+        : current.aiVoice,
+      ambientSoundEnabled:
+        (persisted as { ambientSoundEnabled?: boolean } | undefined)?.ambientSoundEnabled === true,
+      ambientVolume: (() => {
+        const value = (persisted as { ambientVolume?: number } | undefined)?.ambientVolume;
+        return typeof value === 'number' && Number.isFinite(value)
+          ? Math.min(1, Math.max(0.05, value))
+          : current.ambientVolume;
+      })(),
+      sectionOrder: normalizeSectionOrder(
+        (persisted as { sectionOrder?: unknown } | undefined)?.sectionOrder,
+      ),
+      hiddenSections: normalizeHiddenSections(
+        (persisted as { hiddenSections?: unknown } | undefined)?.hiddenSections,
+      ),
+      density: (persisted as { density?: Density } | undefined)?.density === 'compact'
+        ? 'compact'
+        : 'comfortable',
+      accent: (() => {
+        const value = (persisted as { accent?: Accent } | undefined)?.accent;
+        return value === 'sky' || value === 'sunset' || value === 'meadow' ? value : 'aurora';
+      })(),
     }) },
   ),
 );

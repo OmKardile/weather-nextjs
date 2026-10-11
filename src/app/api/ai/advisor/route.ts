@@ -38,12 +38,12 @@ const advisorResponseSchema = z.object({
   activities: z
     .array(
       z.object({
-        activity: z.enum(['running', 'cycling', 'photography', 'outdoor-dining', 'stargazing']),
+        activity: z.enum(['running', 'cycling', 'photography', 'outdoor-dining', 'stargazing', 'laundry']),
         score: z.number().int().min(0).max(100),
         reason: z.string().min(1).max(220),
       }),
     )
-    .length(5),
+    .length(6),
 });
 
 export async function POST(req: Request) {

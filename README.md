@@ -265,3 +265,7 @@ Targets modern evergreen browsers (latest Chrome, Edge, Firefox, Safari). `backd
 ## License
 
 [MIT](./LICENSE) — © 2026 Aether contributors. Weather data by Open-Meteo (CC-BY 4.0).
+
+---
+
+<sub>Designed & developed by [Omkar Kardile](https://omkardile.is-a.dev/)</sub>

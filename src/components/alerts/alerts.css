@@ -1,0 +1,73 @@
+/* ================================================================== */
+/* Alert banner severity tones                                          */
+/*                                                                     */
+/* One class per severity sets three variables:                         */
+/*   --alert-accent — decorative bar / dot / glow color                 */
+/*   --alert-ink    — AA-safe text variant for the severity label,      */
+/*                    icon and link (flips with the scene surface)      */
+/*   --alert-wash   — low-alpha gradient tint behind the banner         */
+/*                                                                     */
+/* Body text always uses the app's text-surface* tokens, so contrast    */
+/* holds on both dark and light scenes; the washes stay low-alpha so    */
+/* they never compromise it. [data-surface="light"] darkens the inks    */
+/* (yellow/amber on frosted white would otherwise fail AA).             */
+/* ================================================================== */
+
+.alert-tone-extreme {
+  --alert-accent: #e1552f;
+  --alert-ink: #ff9b7e;
+  --alert-wash: linear-gradient(90deg, rgb(225 85 47 / 0.22), rgb(225 85 47 / 0.07) 55%, transparent);
+  --alert-glow: 0 0 24px -6px rgb(225 85 47 / 0.65);
+}
+
+.alert-tone-severe {
+  --alert-accent: #f0954a;
+  --alert-ink: #ffb37e;
+  --alert-wash: linear-gradient(90deg, rgb(240 149 74 / 0.18), rgb(240 149 74 / 0.06) 55%, transparent);
+  --alert-glow: 0 0 22px -6px rgb(240 149 74 / 0.5);
+}
+
+.alert-tone-moderate {
+  --alert-accent: #e8c54d;
+  --alert-ink: #f2da83;
+  --alert-wash: linear-gradient(90deg, rgb(232 197 77 / 0.15), rgb(232 197 77 / 0.05) 55%, transparent);
+}
+
+.alert-tone-minor {
+  --alert-accent: #74dcc2;
+  --alert-ink: #a8ebd9;
+  --alert-wash: linear-gradient(90deg, rgb(116 220 194 / 0.13), rgb(116 220 194 / 0.04) 55%, transparent);
+}
+
+.alert-tone-info {
+  --alert-accent: #45d1b3;
+  --alert-ink: #74dcc2;
+  --alert-wash: linear-gradient(90deg, rgb(69 209 179 / 0.13), rgb(69 209 179 / 0.04) 55%, transparent);
+}
+
+/* Light scenes: frosted-white surfaces need darker ink for AA text;
+   washes soften further so the yellow/amber tints stay airy. */
+[data-surface='light'] .alert-tone-extreme {
+  --alert-ink: #b0391b;
+  --alert-wash: linear-gradient(90deg, rgb(225 85 47 / 0.15), rgb(225 85 47 / 0.05) 55%, transparent);
+}
+
+[data-surface='light'] .alert-tone-severe {
+  --alert-ink: #9a5a16;
+  --alert-wash: linear-gradient(90deg, rgb(240 149 74 / 0.13), rgb(240 149 74 / 0.04) 55%, transparent);
+}
+
+[data-surface='light'] .alert-tone-moderate {
+  --alert-ink: #7a600c;
+  --alert-wash: linear-gradient(90deg, rgb(232 197 77 / 0.11), rgb(232 197 77 / 0.04) 55%, transparent);
+}
+
+[data-surface='light'] .alert-tone-minor {
+  --alert-ink: #107263;
+  --alert-wash: linear-gradient(90deg, rgb(116 220 194 / 0.10), rgb(116 220 194 / 0.03) 55%, transparent);
+}
+
+[data-surface='light'] .alert-tone-info {
+  --alert-ink: #0e5f52;
+  --alert-wash: linear-gradient(90deg, rgb(69 209 179 / 0.10), rgb(69 209 179 / 0.03) 55%, transparent);
+}

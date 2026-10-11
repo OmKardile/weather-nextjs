@@ -59,7 +59,16 @@ export type UiIconName =
   | 'command'
   | 'info'
   | 'alert'
-  | 'moon-phase';
+  | 'moon-phase'
+  | 'map'
+  | 'layers'
+  | 'play'
+  | 'pause'
+  | 'radar'
+  | 'satellite'
+  | 'volume'
+  | 'grip'
+  | 'share';
 
 export type IconName = WeatherIconName | UiIconName;
 
@@ -821,6 +830,78 @@ const UI_GLYPHS: Record<UiIconName, (args: { id: string; sw: number }) => ReactN
       {/* full-moon outline (the "shadow" disc) + lit crescent */}
       <circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" strokeWidth={sw} opacity="0.45" />
       <path d="M14 3.6A8.6 8.6 0 0 0 14 20.4A8.6 8.6 0 0 1 14 3.6Z" fill="currentColor" />
+    </g>
+  ),
+  map: ({ sw }) => (
+    <g {...strokeProps(sw)}>
+      {/* folded map: two outer panels + raised center panel */}
+      <path d="M3.6 6.6l5.1-2.3 6.6 2.3 5.1-2.3v13.1l-5.1 2.3-6.6-2.3-5.1 2.3z" />
+      <path d="M8.7 4.3v13.1M15.3 6.6v13.1" />
+    </g>
+  ),
+  layers: ({ sw }) => (
+    <g {...strokeProps(sw)}>
+      <path d="M12 3.6 20 8l-8 4.4L4 8z" />
+      <path d="M5.6 12.6 12 16.1l6.4-3.5" />
+      <path d="M5.6 16.8 12 20.3l6.4-3.5" />
+    </g>
+  ),
+  play: ({ sw }) => (
+    <path
+      d="M8.4 5.6v12.8L19 12z"
+      fill="currentColor"
+      stroke="currentColor"
+      strokeWidth={sw * 0.6}
+      strokeLinejoin="round"
+      strokeLinecap="round"
+    />
+  ),
+  pause: ({ sw }) => (
+    <g fill="currentColor" stroke="currentColor" strokeWidth={sw * 0.5} strokeLinejoin="round">
+      <rect x="6.6" y="5.4" width="3.6" height="13.2" rx="1.5" />
+      <rect x="13.8" y="5.4" width="3.6" height="13.2" rx="1.5" />
+    </g>
+  ),
+  radar: ({ sw }) => (
+    <g {...strokeProps(sw)}>
+      <circle cx="12" cy="12" r="8.6" />
+      <path d="M12 12l5.7-5.7" />
+      <path d="M12 3.4a8.6 8.6 0 0 1 6.1 2.5" />
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+    </g>
+  ),
+  satellite: ({ sw }) => (
+    <g {...strokeProps(sw)} transform="rotate(-45 12 12)">
+      <rect x="10.1" y="8" width="3.8" height="8" rx="1.4" />
+      <path d="M9 10.6 5.7 9M9 13.4 5.7 15M15 10.6 18.3 9M15 13.4 18.3 15" />
+    </g>
+  ),
+  volume: ({ sw }) => (
+    <g {...strokeProps(sw)}>
+      {/* speaker + two sound arcs */}
+      <path d="M4.2 9.4v5.2h2.9l4.5 3.8V5.6L7.1 9.4H4.2z" />
+      <path d="M15.4 9.3a4 4 0 0 1 0 5.4" />
+      <path d="M18 7.1a7.4 7.4 0 0 1 0 9.8" />
+    </g>
+  ),
+  grip: () => (
+    <g fill="currentColor" stroke="none">
+      {/* six-dot drag handle */}
+      <circle cx="9" cy="7" r="1.5" />
+      <circle cx="15" cy="7" r="1.5" />
+      <circle cx="9" cy="12" r="1.5" />
+      <circle cx="15" cy="12" r="1.5" />
+      <circle cx="9" cy="17" r="1.5" />
+      <circle cx="15" cy="17" r="1.5" />
+    </g>
+  ),
+  share: ({ sw }) => (
+    <g {...strokeProps(sw)}>
+      {/* three nodes + connectors */}
+      <circle cx="6.4" cy="12" r="2.5" />
+      <circle cx="17.2" cy="5.8" r="2.5" />
+      <circle cx="17.2" cy="18.2" r="2.5" />
+      <path d="M8.6 10.9l6.4-3.9M8.6 13.1l6.4 3.9" />
     </g>
   ),
 };

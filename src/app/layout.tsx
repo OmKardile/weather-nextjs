@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   description,
   applicationName: "Aether",
   keywords: ["weather", "forecast", "rain", "air quality", "Aether", "Open-Meteo", "PWA"],
-  authors: [{ name: "Aether" }],
+  authors: [{ name: "Omkar Kardile", url: "https://omkardile.is-a.dev/" }],
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

@@ -26,12 +26,16 @@ type AdvisorState =
   | { status: 'done'; data: AdvisorResult }
   | { status: 'error' };
 
-const ACTIVITY_ICONS: Record<ActivityScore['activity'], 'droplet' | 'gauge' | 'eye' | 'sunrise' | 'moon-phase'> = {
+const ACTIVITY_ICONS: Record<
+  ActivityScore['activity'],
+  'droplet' | 'gauge' | 'eye' | 'sunrise' | 'moon-phase'
+> = {
   running: 'droplet',
   cycling: 'gauge',
   photography: 'eye',
   'outdoor-dining': 'sunrise',
   stargazing: 'moon-phase',
+  laundry: 'sunrise',
 };
 
 function scoreTone(score: number): { text: string; bar: string } {
@@ -72,8 +76,8 @@ function AdvisorSkeleton(): JSX.Element {
   return (
     <div className="flex flex-col gap-3">
       <div className="skeleton h-20 rounded-2xl" aria-hidden="true" />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
-        {Array.from({ length: 5 }, (_, i) => (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {Array.from({ length: 6 }, (_, i) => (
           <div key={i} className="skeleton h-32 rounded-2xl" aria-hidden="true" />
         ))}
       </div>
@@ -107,7 +111,7 @@ export function AdvisorCards({ city, units, className }: AdvisorCardsProps): JSX
           !data ||
           !data.outfit ||
           !Array.isArray(data.activities) ||
-          data.activities.length !== 5
+          data.activities.length !== 6
         ) {
           throw new Error('invalid advisor payload');
         }
@@ -150,7 +154,7 @@ export function AdvisorCards({ city, units, className }: AdvisorCardsProps): JSX
               ))}
             </div>
           </Glass>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {state.data.activities.map((activity) => (
               <ActivityCard key={activity.activity} activity={activity} />
             ))}

@@ -1,23 +1,27 @@
 'use client';
 
-import {
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type {
   CSSProperties,
   KeyboardEvent as ReactKeyboardEvent,
   PointerEvent as ReactPointerEvent,
 } from 'react';
-import type { HourlyPoint, Units } from '@/types/weather';
+import type { EnsembleHourly, HourlyPoint, Units } from '@/types/weather';
 import { formatHour, formatHourShort, formatTemp } from '@/lib/units';
 import { cn } from '@/lib/utils';
+import {
+  AURORA_300,
+  AURORA_400,
+  AURORA_500,
+  clamp,
+  f,
+  smoothPath,
+  useMotionOk,
+} from '@/components/weather/chart-helpers';
 
 /* ------------------------------------------------------------------ */
-/* Hand-rolled SVG temperature chart (Task 2-b)                        */
+/* Hand-rolled SVG temperature chart (Task 2-b; 17-a added the        */
+/* ensemble uncertainty band)                                         */
 /*                                                                    */
 /* Deliberately replaces recharts (~100 kB) with a few kB of           */
 /* purpose-built SVG that matches the glass design system.             */
@@ -25,44 +29,8 @@ import { cn } from '@/lib/utils';
 /* precip probability bars · hour labels.                              */
 /* ------------------------------------------------------------------ */
 
-/** Aurora data hexes (mirror the @theme scale in globals.css). */
-const AURORA_300 = '#74DCC2';
-const AURORA_400 = '#45D1B3';
-const AURORA_500 = '#22BCA0';
-
 const TOP_PAD = 36; // headroom for the max pill
 const PRECIP_MAX_BAR = 28; // px height for a 100 % chance
-
-const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
-/** 2-decimal precision for path/attr output. */
-const f = (v: number) => Math.round(v * 100) / 100;
-
-interface Pt {
-  x: number;
-  y: number;
-}
-
-/**
- * Catmull-Rom spline through every point, converted segment by segment
- * to cubic Béziers (control points at ±1/6 of the neighbour delta).
- * Endpoints use clamped phantoms, so the curve never leaves the point
- * hull's x-range. No dependencies.
- */
-function smoothPath(pts: Pt[]): string {
-  if (pts.length < 2) return '';
-  let d = `M ${f(pts[0].x)} ${f(pts[0].y)}`;
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] ?? pts[i];
-    const p1 = pts[i];
-    const p2 = pts[i + 1];
-    const p3 = pts[i + 2] ?? p2;
-    d +=
-      ` C ${f(p1.x + (p2.x - p0.x) / 6)} ${f(p1.y + (p2.y - p0.y) / 6)}` +
-      ` ${f(p2.x - (p3.x - p1.x) / 6)} ${f(p2.y - (p3.y - p1.y) / 6)}` +
-      ` ${f(p2.x)} ${f(p2.y)}`;
-  }
-  return d;
-}
 
 interface ChartData {
   temps: number[];
@@ -87,15 +55,29 @@ interface ChartGeom {
   labelY: number;
   noteY: number;
   barW: number;
+  labelEvery: number;
+  /** Y-scale inputs, reused by the ensemble band. */
+  lo: number;
+  hi: number;
+  curveBottom: number;
+}
+
+/** One contiguous run of ensemble spread values (temp ± σ) matched by time. */
+interface BandSegment {
+  top: string;
+  bottom: string;
 }
 
 export function TemperatureChart({
   hours,
   units,
+  ensemble,
   className,
 }: {
   hours: HourlyPoint[];
   units: Units;
+  /** Ensemble series matched by time — draws an uncertainty band behind the curve. */
+  ensemble?: EnsembleHourly[] | null;
   className?: string;
 }) {
   const rawId = useId();
@@ -179,8 +161,52 @@ export function TemperatureChart({
       labelY: height - 8,
       noteY: height - 32,
       barW: Math.min(10, slot * 0.32),
+      labelEvery: n > 36 ? 6 : 3,
+      lo,
+      hi,
+      curveBottom,
     };
   }, [data, width, units]);
+
+  /* --- ensemble uncertainty band: temp ± σ behind the curve ------------- */
+  const band = useMemo<BandSegment[]>(() => {
+    if (!geom || !ensemble || ensemble.length === 0) return [];
+    const spreadByTime = new Map<string, EnsembleHourly>();
+    for (const point of ensemble) spreadByTime.set(point.time, point);
+    const yOf = (t: number) =>
+      f(
+        clamp(
+          geom.curveBottom - ((t - geom.lo) / (geom.hi - geom.lo)) * (geom.curveBottom - TOP_PAD),
+          TOP_PAD - 6,
+          geom.curveBottom,
+        ),
+      );
+    const segments: BandSegment[] = [];
+    let run: Array<{ x: number; top: number; bottom: number }> = [];
+    const flush = () => {
+      if (run.length >= 2) {
+        segments.push({
+          top: smoothPath(run.map((p) => ({ x: p.x, y: p.top }))),
+          bottom: smoothPath([...run].reverse().map((p) => ({ x: p.x, y: p.bottom }))),
+        });
+      }
+      run = [];
+    };
+    hours.forEach((hour, i) => {
+      const matched = spreadByTime.get(hour.time);
+      if (matched && matched.tempSpread != null) {
+        run.push({
+          x: geom.xs[i],
+          top: yOf(matched.temp + matched.tempSpread),
+          bottom: yOf(matched.temp - matched.tempSpread),
+        });
+      } else {
+        flush();
+      }
+    });
+    flush();
+    return segments;
+  }, [geom, ensemble, hours]);
 
   const ready = data !== null && geom !== null;
 
@@ -274,7 +300,7 @@ export function TemperatureChart({
         data.allZero
           ? 'No precipitation expected.'
           : `Precipitation chance up to ${Math.round(data.maxProb)}%.`
-      }`;
+      }${band.length > 0 ? ' Shaded band shows the ensemble forecast uncertainty.' : ''}`;
 
   /* --- optional ≤500 ms draw-in, only when motion is allowed --- */
   const drawCls = `${gid}-draw`;
@@ -379,6 +405,11 @@ export function TemperatureChart({
                 <stop offset="0" stopColor="rgb(69 209 179 / 0.2)" />
                 <stop offset="1" stopColor="rgb(69 209 179 / 0)" />
               </linearGradient>
+              <linearGradient id={`${gid}-band`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0" stopColor="rgb(69 209 179 / 0.16)" />
+                <stop offset="0.5" stopColor="rgb(69 209 179 / 0.09)" />
+                <stop offset="1" stopColor="rgb(69 209 179 / 0.16)" />
+              </linearGradient>
             </defs>
 
             {/* area under the curve */}
@@ -387,6 +418,27 @@ export function TemperatureChart({
               fill={`url(#${gid}-area)`}
               className={motionOk ? fadeCls : undefined}
             />
+
+            {/* ensemble uncertainty band (temp ± σ) behind the curve */}
+            {band.length > 0 ? (
+              <g className={motionOk ? fadeCls : undefined} aria-hidden="true">
+                {band.map((segment, i) => {
+                  // Top edge runs left→right, bottom edge (already reversed)
+                  // right→left — drop its "M x y" head and chain on.
+                  const bottomRest = segment.bottom.slice(segment.bottom.indexOf('C'));
+                  return (
+                    <path
+                      key={i}
+                      d={`${segment.top} ${bottomRest} Z`}
+                      fill={`url(#${gid}-band)`}
+                      stroke={AURORA_300}
+                      strokeWidth={0.75}
+                      strokeOpacity={0.3}
+                    />
+                  );
+                })}
+              </g>
+            ) : null}
 
             {/* scrub guide */}
             {showActive ? (
@@ -412,7 +464,7 @@ export function TemperatureChart({
                   fontSize={11}
                   style={{ fill: "var(--surface-muted)" }}
                 >
-                  No precipitation expected in the next 24h
+                  {`No precipitation expected in the next ${hours.length}h`}
                 </text>
               ) : (
                 data.probs.map((p, i) =>
@@ -447,7 +499,7 @@ export function TemperatureChart({
             {/* hour labels, extreme pills, "now" marker */}
             <g className={motionOk ? lateCls : undefined}>
               {hours.map((h, i) =>
-                i % 3 === 0 ? (
+                i % geom.labelEvery === 0 ? (
                   <text
                     key={i}
                     x={clamp(geom.xs[i], 14, width - 14)}

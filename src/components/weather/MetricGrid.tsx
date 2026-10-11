@@ -23,11 +23,15 @@ import {
   uvInfo,
   visibilityLabel,
 } from '@/lib/units';
-import type { HourlyPoint, Units, WeatherBundle } from '@/types/weather';
+import { ExpandableCard } from '@/components/weather/ExpandableCard';
+import { MarineCard } from '@/components/weather/MarineCard';
+import type { City, HourlyPoint, Units, WeatherBundle } from '@/types/weather';
 
 interface MetricGridProps {
   data: WeatherBundle;
   units: Units;
+  /** Active city — powers the marine card fetch. */
+  city: City;
 }
 
 function dewPoint(celsius: number, humidity: number): number {
@@ -37,6 +41,7 @@ function dewPoint(celsius: number, humidity: number): number {
   return (b * alpha) / (a - alpha);
 }
 
+/** Non-expandable card chrome (used by Sun path only). */
 function Card({
   icon,
   label,
@@ -49,7 +54,7 @@ function Card({
   className?: string;
 }) {
   return (
-    <div className={`glass glass-hover rounded-[var(--radius-card)] p-4 ${className ?? ''}`}>
+    <div className={`glass rounded-[var(--radius-card)] p-4 ${className ?? ''}`}>
       <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
         <span aria-hidden="true">{icon}</span>
         {label}
@@ -64,7 +69,13 @@ function WindCompass({ data, units }: { data: WeatherBundle; units: Units }) {
   const to = (windDirection + 180) % 360; // arrow points downwind
 
   return (
-    <Card icon={<Wind className="h-3.5 w-3.5" />} label="Wind">
+    <ExpandableCard
+      label="Wind"
+      group="wind"
+      bundle={data}
+      units={units}
+      icon={<Wind className="h-3.5 w-3.5" />}
+    >
       <div className="mt-2 flex items-center gap-3">
         <svg viewBox="0 0 72 72" className="h-16 w-16 shrink-0" role="img" aria-label={`Wind from ${compassPoint(windDirection)}`}>
           <circle cx="36" cy="36" r="30" fill="none" style={{ stroke: "var(--surface-border)" }} strokeWidth="2" />
@@ -97,7 +108,7 @@ function WindCompass({ data, units }: { data: WeatherBundle; units: Units }) {
           <p className="tnum text-xs text-surface-faint">gusts {formatWind(windGust, units)}</p>
         </div>
       </div>
-    </Card>
+    </ExpandableCard>
   );
 }
 
@@ -171,79 +182,102 @@ function SunArc({ data, units }: { data: WeatherBundle; units: Units }) {
   );
 }
 
-function UvCard({ uv }: { uv: number }) {
-  const info = uvInfo(uv);
-  const position = Math.min(uv / 11, 1) * 100;
-
-  return (
-    <Card icon={<Sun className="h-3.5 w-3.5" />} label="UV index">
-      <div className="mt-2 flex items-baseline gap-2">
-        <span className="tnum text-xl font-semibold text-surface">{uv.toFixed(1)}</span>
-        <span className="text-xs font-medium" style={{ color: info.color }}>
-          {info.label}
-        </span>
-      </div>
-      <div className="relative mt-2.5 h-1.5 rounded-full" aria-hidden="true">
-        <div
-          className="absolute inset-0 rounded-full"
-          style={{
-            background:
-              'linear-gradient(90deg, #22BCA0 0%, #E8C54D 35%, #F0954A 60%, #E1552F 80%, #9B4A9E 100%)',
-            opacity: 0.85,
-          }}
-        />
-        <div
-          className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-white shadow"
-          style={{ left: `${position}%`, background: info.color }}
-        />
-      </div>
-    </Card>
-  );
-}
-
-export function MetricGrid({ data, units }: MetricGridProps) {
+export function MetricGrid({ data, units, city }: MetricGridProps) {
   const { current, hourly } = data;
   const next24 = hourly as HourlyPoint[];
   const maxPrecipChance = Math.max(...next24.map((hour) => hour.precipitationProbability), 0);
   const uvNow = next24[0]?.uvIndex ?? 0;
   const visibilityM = next24[0]?.visibility ?? 24_000;
+  const dp = dewPoint(current.temperature, current.humidity);
+  const uvInfoNow = uvInfo(uvNow);
+  const uvPosition = Math.min(uvNow / 11, 1) * 100;
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       <WindCompass data={data} units={units} />
+      <MarineCard city={city} units={units} />
 
-      <Card icon={<Droplets className="h-3.5 w-3.5" />} label="Humidity">
+      <ExpandableCard
+        label="Humidity"
+        group="humidity"
+        bundle={data}
+        units={units}
+        icon={<Droplets className="h-3.5 w-3.5" />}
+      >
         <p className="tnum mt-2 text-xl font-semibold text-surface">{Math.round(current.humidity)}%</p>
-        <p className="tnum mt-1 text-xs text-surface-muted">
-          Dew point {formatTemp(dewPoint(current.temperature, current.humidity), units)}
-        </p>
+        <p className="tnum mt-1 text-xs text-surface-muted">Dew point {formatTemp(dp, units)}</p>
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]" aria-hidden="true">
           <div
             className="h-full rounded-full bg-gradient-to-r from-aurora-500 to-aurora-300 transition-all duration-500"
             style={{ width: `${Math.min(current.humidity, 100)}%` }}
           />
         </div>
-      </Card>
+      </ExpandableCard>
 
-      <UvCard uv={uvNow} />
+      <ExpandableCard
+        label="UV index"
+        group="uv"
+        bundle={data}
+        units={units}
+        icon={<Sun className="h-3.5 w-3.5" />}
+      >
+        <div className="mt-2 flex items-baseline gap-2">
+          <span className="tnum text-xl font-semibold text-surface">{uvNow.toFixed(1)}</span>
+          <span className="text-xs font-medium" style={{ color: uvInfoNow.color }}>
+            {uvInfoNow.label}
+          </span>
+        </div>
+        <div className="relative mt-2.5 h-1.5 rounded-full" aria-hidden="true">
+          <div
+            className="absolute inset-0 rounded-full"
+            style={{
+              background:
+                'linear-gradient(90deg, #22BCA0 0%, #E8C54D 35%, #F0954A 60%, #E1552F 80%, #9B4A9E 100%)',
+              opacity: 0.85,
+            }}
+          />
+          <div
+            className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-white shadow"
+            style={{ left: `${uvPosition}%`, background: uvInfoNow.color }}
+          />
+        </div>
+      </ExpandableCard>
 
-      <Card icon={<Eye className="h-3.5 w-3.5" />} label="Visibility">
+      <ExpandableCard
+        label="Visibility"
+        group="visibility"
+        bundle={data}
+        units={units}
+        icon={<Eye className="h-3.5 w-3.5" />}
+      >
         <p className="tnum mt-2 text-xl font-semibold text-surface">
           {formatVisibility(visibilityM, units)}
         </p>
         <p className="mt-1 text-xs text-surface-muted">{visibilityLabel(visibilityM)}</p>
-      </Card>
+      </ExpandableCard>
 
-      <Card icon={<Gauge className="h-3.5 w-3.5" />} label="Pressure">
+      <ExpandableCard
+        label="Pressure"
+        group="pressure"
+        bundle={data}
+        units={units}
+        icon={<Gauge className="h-3.5 w-3.5" />}
+      >
         <p className="tnum mt-2 text-xl font-semibold text-surface">
           {formatPressure(current.pressure, units)}
         </p>
         <p className="mt-1 text-xs text-surface-muted">
           {current.pressure < 1000 ? 'Low' : current.pressure > 1025 ? 'High' : 'Normal'} · sea level
         </p>
-      </Card>
+      </ExpandableCard>
 
-      <Card icon={<Cloud className="h-3.5 w-3.5" />} label="Cloud cover">
+      <ExpandableCard
+        label="Cloud cover"
+        group="cloud"
+        bundle={data}
+        units={units}
+        icon={<Cloud className="h-3.5 w-3.5" />}
+      >
         <p className="tnum mt-2 text-xl font-semibold text-surface">{Math.round(current.cloudCover)}%</p>
         <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]" aria-hidden="true">
           <div
@@ -251,18 +285,30 @@ export function MetricGrid({ data, units }: MetricGridProps) {
             style={{ width: `${Math.min(current.cloudCover, 100)}%` }}
           />
         </div>
-      </Card>
+      </ExpandableCard>
 
-      <Card icon={<Umbrella className="h-3.5 w-3.5" />} label="Precipitation">
+      <ExpandableCard
+        label="Precipitation"
+        group="precip"
+        bundle={data}
+        units={units}
+        icon={<Umbrella className="h-3.5 w-3.5" />}
+      >
         <p className="tnum mt-2 text-xl font-semibold text-surface">
           {formatPrecip(current.precipitation, units)}
         </p>
         <p className="tnum mt-1 text-xs text-surface-muted">
           Up to {maxPrecipChance}% chance in 24h
         </p>
-      </Card>
+      </ExpandableCard>
 
-      <Card icon={<Thermometer className="h-3.5 w-3.5" />} label="Feels like">
+      <ExpandableCard
+        label="Feels like"
+        group="temp"
+        bundle={data}
+        units={units}
+        icon={<Thermometer className="h-3.5 w-3.5" />}
+      >
         <p className="tnum mt-2 text-xl font-semibold text-surface">
           {displayTemp(current.apparentTemperature, units)}°
         </p>
@@ -273,7 +319,7 @@ export function MetricGrid({ data, units }: MetricGridProps) {
               ? 'Wind makes it feel cooler'
               : 'Close to actual temperature'}
         </p>
-      </Card>
+      </ExpandableCard>
 
       <SunArc data={data} units={units} />
     </div>

@@ -342,18 +342,6 @@
     border-color: var(--surface-ring);
   }
 
-  .text-surface {
-    color: var(--surface-text);
-  }
-
-  .text-surface-muted {
-    color: var(--surface-muted);
-  }
-
-  .text-surface-faint {
-    color: var(--surface-faint);
-  }
-
   .border-surface {
     border-color: var(--surface-border);
   }
@@ -428,6 +416,29 @@
 }
 
 /* ------------------------------------------------------------------ */
+/* Surface text colors — Tailwind @utility (top level, NOT @layer)     */
+/*                                                                      */
+/* Registered as @utility so variant prefixes (hover:, group-hover:,    */
+/* md:…) actually generate. As plain @layer components classes they     */
+/* never did — every `hover:text-surface` written since v2.0 was        */
+/* silently inert. Same declarations, now with working variants.       */
+/* Cascade-safe: no element pairs a surface text class with a          */
+/* competing color utility (all such usages are exclusive ternaries).  */
+/* ------------------------------------------------------------------ */
+
+@utility text-surface {
+  color: var(--surface-text);
+}
+
+@utility text-surface-muted {
+  color: var(--surface-muted);
+}
+
+@utility text-surface-faint {
+  color: var(--surface-faint);
+}
+
+/* ------------------------------------------------------------------ */
 /* Reduced motion — respect user preference everywhere                 */
 /* ------------------------------------------------------------------ */
 
@@ -442,4 +453,169 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ================================================================== */
+/* Task 20-b — personalization (additive)                              */
+/* ================================================================== */
+
+/* ------------------------------------------------------------------ */
+/* Density — data-density lives on the ForecastSections wrapper.       */
+/* Compact tightens section gaps, card padding and grid rhythm.        */
+/* These rules are deliberately UNLAYERED so they win over the         */
+/* authored Tailwind padding utilities (p-4/p-5/px-*) on the same      */
+/* elements; the attribute + class compound also out-specifies them.   */
+/* ------------------------------------------------------------------ */
+
+[data-density="compact"].fs-sections {
+  gap: 0.875rem;
+}
+
+[data-density="compact"] .fs-grid {
+  gap: 0.75rem;
+}
+
+[data-density="compact"] .fs-card,
+[data-density="compact"] .fs-sections .glass,
+[data-density="compact"] .fs-sections .glass-strong {
+  padding: 0.75rem;
+}
+
+[data-density="compact"] .fs-stack {
+  margin-top: 0.75rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Accent presets — shift the aurora hue (same saturation + lightness  */
+/* as the default teal, so text contrast is preserved in both light    */
+/* and dark scenes). data-accent sits on the app root next to          */
+/* data-surface / data-tint; compound selectors out-specify the        */
+/* base [data-tint] rules above. "aurora" (default) ships no rules.    */
+/* ------------------------------------------------------------------ */
+
+[data-accent="sky"] {
+  --color-aurora-50: #edf5fb;
+  --color-aurora-100: #d3e7f5;
+  --color-aurora-200: #a8cfeb;
+  --color-aurora-300: #74b1dc;
+  --color-aurora-400: #4597d1;
+  --color-aurora-500: #227cbc;
+  --color-aurora-600: #155d90;
+  --color-aurora-700: #104972;
+  --ring: #4597d1;
+  --primary: #227cbc;
+  --sidebar-primary: #227cbc;
+  --surface-ring: #4597d1;
+  --shadow-glow: 0 0 32px -6px rgb(69 151 209 / 0.55);
+}
+[data-accent="sky"][data-surface="light"] { --surface-ring: #0e4e7c; }
+[data-accent="sky"] ::selection { background: rgb(69 151 209 / 0.35); }
+[data-accent="sky"][data-tint="clear"] { --glass-tint: 105 163 205; }
+[data-accent="sky"][data-tint="partly-cloudy"] { --glass-tint: 126 169 199; }
+[data-accent="sky"][data-tint="cloudy"] { --glass-tint: 158 169 176; }
+[data-accent="sky"][data-tint="fog"] { --glass-tint: 176 184 190; }
+[data-accent="sky"][data-tint="drizzle"] { --glass-tint: 118 140 156; }
+[data-accent="sky"][data-tint="rain"] { --glass-tint: 96 118 134; }
+[data-accent="sky"][data-tint="snow"] { --glass-tint: 198 214 226; }
+[data-accent="sky"][data-tint="thunder"] { --glass-tint: 112 145 168; }
+
+[data-accent="sunset"] {
+  --color-aurora-50: #fbf1ed;
+  --color-aurora-100: #f5ddd3;
+  --color-aurora-200: #ebbca8;
+  --color-aurora-300: #dc9374;
+  --color-aurora-400: #d16f45;
+  --color-aurora-500: #bc5022;
+  --color-aurora-600: #903a15;
+  --color-aurora-700: #722d10;
+  --ring: #d16f45;
+  --primary: #bc5022;
+  --sidebar-primary: #bc5022;
+  --surface-ring: #d16f45;
+  --shadow-glow: 0 0 32px -6px rgb(209 111 69 / 0.55);
+}
+[data-accent="sunset"][data-surface="light"] { --surface-ring: #7c2f0e; }
+[data-accent="sunset"] ::selection { background: rgb(209 111 69 / 0.35); }
+[data-accent="sunset"][data-tint="clear"] { --glass-tint: 205 135 105; }
+[data-accent="sunset"][data-tint="partly-cloudy"] { --glass-tint: 199 148 126; }
+[data-accent="sunset"][data-tint="cloudy"] { --glass-tint: 176 163 158; }
+[data-accent="sunset"][data-tint="fog"] { --glass-tint: 190 180 176; }
+[data-accent="sunset"][data-tint="drizzle"] { --glass-tint: 156 129 118; }
+[data-accent="sunset"][data-tint="rain"] { --glass-tint: 134 107 96; }
+[data-accent="sunset"][data-tint="snow"] { --glass-tint: 226 206 198; }
+[data-accent="sunset"][data-tint="thunder"] { --glass-tint: 168 129 112; }
+
+[data-accent="meadow"] {
+  --color-aurora-50: #f1fbed;
+  --color-aurora-100: #dbf5d3;
+  --color-aurora-200: #b9eba8;
+  --color-aurora-300: #8edc74;
+  --color-aurora-400: #68d145;
+  --color-aurora-500: #49bc22;
+  --color-aurora-600: #349015;
+  --color-aurora-700: #297210;
+  --ring: #68d145;
+  --primary: #49bc22;
+  --sidebar-primary: #49bc22;
+  --surface-ring: #68d145;
+  --shadow-glow: 0 0 32px -6px rgb(104 209 69 / 0.55);
+}
+[data-accent="meadow"][data-surface="light"] { --surface-ring: #297c0e; }
+[data-accent="meadow"] ::selection { background: rgb(104 209 69 / 0.35); }
+[data-accent="meadow"][data-tint="clear"] { --glass-tint: 130 205 105; }
+[data-accent="meadow"][data-tint="partly-cloudy"] { --glass-tint: 144 199 126; }
+[data-accent="meadow"][data-tint="cloudy"] { --glass-tint: 163 176 158; }
+[data-accent="meadow"][data-tint="fog"] { --glass-tint: 179 190 176; }
+[data-accent="meadow"][data-tint="drizzle"] { --glass-tint: 128 156 118; }
+[data-accent="meadow"][data-tint="rain"] { --glass-tint: 106 134 96; }
+[data-accent="meadow"][data-tint="snow"] { --glass-tint: 205 226 198; }
+[data-accent="meadow"][data-tint="thunder"] { --glass-tint: 126 168 112; }
+
+/* ------------------------------------------------------------------ */
+/* Ambient-sound volume slider — native range input on app tokens.     */
+/* --fill (0–100%) is set inline from React to paint the filled side.  */
+/* ------------------------------------------------------------------ */
+
+.ambient-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 9rem;
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    var(--color-aurora-400) var(--fill, 50%),
+    var(--surface-border) var(--fill, 50%)
+  );
+  cursor: pointer;
+}
+
+.ambient-slider:focus-visible {
+  outline: 2px solid var(--surface-ring);
+  outline-offset: 4px;
+}
+
+.ambient-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--color-aurora-400);
+  border: 2px solid rgb(255 255 255 / 0.75);
+  box-shadow: 0 1px 4px rgb(10 27 30 / 0.4);
+  transition: transform 150ms var(--ease-soft);
+}
+
+.ambient-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+
+.ambient-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--color-aurora-400);
+  border: 2px solid rgb(255 255 255 / 0.75);
+  box-shadow: 0 1px 4px rgb(10 27 30 / 0.4);
 }

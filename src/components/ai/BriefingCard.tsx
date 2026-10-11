@@ -4,13 +4,16 @@ import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import { Glass } from '@/components/glass/Glass';
 import { Icon } from '@/components/icons/Icon';
-import { MarkdownLite, StreamingCursor, readNdjsonStream } from '@/components/ai/ai-shared';
+import { AiBadge, MarkdownLite, StreamingCursor, readNdjsonStream } from '@/components/ai/ai-shared';
+import { usePreferences } from '@/hooks/use-preferences';
 import { cn } from '@/lib/utils';
+import { AI_VOICE_OPTIONS } from '@/types/ai';
 import type { AiProvider, AiStreamEvent } from '@/types/ai';
 import type { City, Units } from '@/types/weather';
 
 /* ================================================================== */
 /* BriefingCard — flagship AI surface at the top of the content column */
+/* Two streamed tabs: the factual briefing and the 24-hour story.      */
 /* ================================================================== */
 
 interface BriefingCardProps {
@@ -18,6 +21,8 @@ interface BriefingCardProps {
   units: Units;
   className?: string;
 }
+
+type CardView = 'briefing' | 'story';
 
 interface BriefingState {
   status: 'loading' | 'streaming' | 'done' | 'error';
@@ -36,13 +41,22 @@ const INITIAL_STATE: BriefingState = {
 };
 
 const DEFAULT_ERROR = "Couldn't load the briefing.";
+const STORY_ERROR = "Couldn't load the story.";
+
+const VIEW_META: Record<CardView, { label: string; fallbackLabel: string; error: string }> = {
+  briefing: { label: 'Briefing', fallbackLabel: 'Weather summary', error: DEFAULT_ERROR },
+  story: { label: 'Story', fallbackLabel: 'Weather story', error: STORY_ERROR },
+};
 
 export function BriefingCard({ city, units, className }: BriefingCardProps): JSX.Element {
   const [state, setState] = useState<BriefingState>(INITIAL_STATE);
   const [retryCount, setRetryCount] = useState(0);
+  /** Last tab is remembered in state across city/voice changes. */
+  const [view, setView] = useState<CardView>('briefing');
+  const aiVoice = usePreferences((s) => s.aiVoice);
 
   const { id: cityId, name, country, latitude, longitude } = city;
-  const fetchKey = `${cityId}|${units}|${retryCount}`;
+  const fetchKey = `${cityId}|${units}|${retryCount}|${view}|${aiVoice}`;
 
   // Reset when the fetch key changes — render-time adjustment (React-endorsed
   // pattern) instead of a synchronous setState inside the effect.
@@ -57,21 +71,23 @@ export function BriefingCard({ city, units, className }: BriefingCardProps): JSX
     let active = true;
     let sawDone = false;
     let streamError: string | null = null;
+    const meta = VIEW_META[view];
 
     void (async () => {
       try {
-        const response = await fetch('/api/ai/briefing', {
+        const response = await fetch(view === 'briefing' ? '/api/ai/briefing' : '/api/ai/story', {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
             city: { name, country, latitude, longitude },
             units,
+            voice: aiVoice,
           }),
           signal: controller.signal,
         });
 
         if (!response.ok || !response.body) {
-          let message = DEFAULT_ERROR;
+          let message = meta.error;
           try {
             const data = (await response.json()) as { error?: unknown };
             if (typeof data?.error === 'string' && data.error) message = data.error;
@@ -100,7 +116,7 @@ export function BriefingCard({ city, units, className }: BriefingCardProps): JSX
               return;
             case 'error':
               sawDone = true;
-              streamError = event.message || DEFAULT_ERROR;
+              streamError = event.message || meta.error;
               return;
             default:
               return;
@@ -114,11 +130,11 @@ export function BriefingCard({ city, units, className }: BriefingCardProps): JSX
           setState((prev) => ({
             ...prev,
             status: sawDone ? 'done' : 'error',
-            error: sawDone ? null : 'The briefing was interrupted — try again.',
+            error: sawDone ? null : `${meta.error} Try again in a moment.`,
           }));
         }
       } catch {
-        if (active) setState((prev) => ({ ...prev, status: 'error', error: DEFAULT_ERROR }));
+        if (active) setState((prev) => ({ ...prev, status: 'error', error: meta.error }));
       }
     })();
 
@@ -126,18 +142,26 @@ export function BriefingCard({ city, units, className }: BriefingCardProps): JSX
       active = false;
       controller.abort();
     };
-  }, [cityId, name, country, latitude, longitude, units, retryCount, fetchKey]);
+  }, [cityId, name, country, latitude, longitude, units, retryCount, view, aiVoice]);
 
   const isFallback = state.provider === 'fallback';
   const isBusy = state.status === 'loading' || state.status === 'streaming';
   const showSparkle = !isFallback; // optimistic until meta says fallback
+  const voiceLabel = AI_VOICE_OPTIONS.find((option) => option.id === aiVoice)?.label ?? 'Pro';
+
+  const sectionLabel =
+    view === 'briefing'
+      ? isFallback
+        ? VIEW_META.briefing.fallbackLabel
+        : 'AI briefing'
+      : VIEW_META.story.fallbackLabel;
 
   return (
     <Glass
       level="raised"
       refract
       as="section"
-      aria-label={isFallback ? 'Weather summary' : 'AI briefing'}
+      aria-label={sectionLabel}
       className={cn('rounded-[var(--radius-card)] p-5', className)}
     >
       <div className="flex items-center gap-3">
@@ -156,12 +180,40 @@ export function BriefingCard({ city, units, className }: BriefingCardProps): JSX
             <Icon name="info" size={16} />
           </span>
         )}
-        <p
-          title={isFallback ? 'Rule-based summary (AI offline)' : undefined}
-          className="text-[11px] font-semibold uppercase tracking-[0.14em] text-surface-muted"
+        <div
+          role="group"
+          aria-label="AI card view"
+          className="glass-subtle flex h-8 items-center rounded-full p-0.5"
         >
-          {isFallback ? 'Summary' : 'AI briefing'}
-        </p>
+          {(Object.keys(VIEW_META) as CardView[]).map((key) => {
+            const active = view === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                aria-pressed={active}
+                onClick={active ? undefined : () => setView(key)}
+                className={cn(
+                  'focus-ring h-7 rounded-full px-3 text-[11px] font-semibold transition-all duration-200',
+                  active
+                    ? 'bg-aurora-500 text-[#04211C] shadow-[0_0_14px_-4px_rgb(34_188_160/0.8)]'
+                    : 'text-surface-muted hover:text-surface',
+                )}
+              >
+                {VIEW_META[key].label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <span
+            title={`AI voice: ${voiceLabel} — tone only, numbers never change`}
+            className="rounded-full border border-surface bg-[var(--surface-subtle)] px-1.5 py-[3px] text-[9px] font-semibold uppercase leading-none tracking-[0.08em] text-surface-muted"
+          >
+            {voiceLabel}
+          </span>
+          <AiBadge provider={state.provider} />
+        </div>
       </div>
 
       <div className="mt-3 min-h-[72px]" aria-live="polite" aria-busy={isBusy || undefined}>
@@ -173,7 +225,7 @@ export function BriefingCard({ city, units, className }: BriefingCardProps): JSX
               </div>
             ) : null}
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-2">
-              <p className="text-sm text-surface-muted">{state.error ?? DEFAULT_ERROR}</p>
+              <p className="text-sm text-surface-muted">{state.error ?? VIEW_META[view].error}</p>
               <button
                 type="button"
                 onClick={() => setRetryCount((count) => count + 1)}

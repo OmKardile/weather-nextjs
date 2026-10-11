@@ -1,10 +1,12 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Logo } from '@/components/brand/Logo';
 import { Icon } from '@/components/icons/Icon';
 import { WeatherIcon } from '@/components/weather/WeatherIcon';
+import { toggleAmbientSound } from '@/hooks/use-ambient-sound';
+import { usePreferences } from '@/hooks/use-preferences';
 import { formatLocalClock } from '@/lib/time';
 import { springs } from '@/lib/motion';
 import { formatTemp } from '@/lib/units';
@@ -24,12 +26,25 @@ interface MenuBarProps {
   units: Units;
   scrolled: boolean;
   aiOpen: boolean;
+  mapOpen: boolean;
   locating: boolean;
   onToggleUnits: () => void;
   onOpenPalette: () => void;
   onToggleAi: () => void;
+  onToggleMap: () => void;
   onOpenSettings: () => void;
   onLocate: () => void;
+}
+
+const emptySubscribe = () => () => {};
+
+/** True once hydrated on the client (server render sees false). */
+function useHydrated(): boolean {
+  return useSyncExternalStore(
+    emptySubscribe,
+    () => true,
+    () => false,
+  );
 }
 
 function UnitToggle({ units, onToggle }: { units: Units; onToggle: () => void }) {
@@ -102,15 +117,21 @@ export function MenuBar({
   units,
   scrolled,
   aiOpen,
+  mapOpen,
   locating,
   onToggleUnits,
   onOpenPalette,
   onToggleAi,
+  onToggleMap,
   onOpenSettings,
   onLocate,
 }: MenuBarProps) {
   // Live local clock for the active city.
   const [tick, setTick] = useState(0);
+  // Hydration gate — the persisted ambient preference differs from the
+  // server default, so the pressed state only applies after mount.
+  const hydrated = useHydrated();
+  const ambientEnabled = usePreferences((state) => state.ambientSoundEnabled);
   useEffect(() => {
     const timer = window.setInterval(() => setTick((v) => v + 1), 30_000);
     return () => window.clearInterval(timer);
@@ -195,6 +216,12 @@ export function MenuBar({
               className="hidden lg:flex"
             />
             <UnitToggle units={units} onToggle={onToggleUnits} />
+            <IconActionButton
+              label={ambientEnabled ? 'Mute ambient sound' : 'Play ambient sound'}
+              icon={<Icon name="volume" size={17} />}
+              onClick={toggleAmbientSound}
+              active={hydrated && ambientEnabled}
+            />
             <button
               type="button"
               onClick={onOpenPalette}
@@ -213,6 +240,12 @@ export function MenuBar({
               icon={<Icon name="sparkle" size={17} animated />}
               onClick={onToggleAi}
               active={aiOpen}
+            />
+            <IconActionButton
+              label={mapOpen ? 'Close map' : 'Open map'}
+              icon={<Icon name="map" size={17} animated />}
+              onClick={onToggleMap}
+              active={mapOpen}
             />
             <IconActionButton
               label="Settings"

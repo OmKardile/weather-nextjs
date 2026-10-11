@@ -32,10 +32,12 @@ interface CommandPaletteProps {
   activeCitySaved: boolean;
   units: Units;
   theme: ThemeMode;
+  mapOpen: boolean;
   onSelectCity: (city: City) => void;
   onToggleUnits: () => void;
   onSetTheme: (theme: ThemeMode) => void;
   onAskAi: () => void;
+  onToggleMap: () => void;
   onLocate: () => void;
   locating: boolean;
   onSaveCurrentCity: () => void;
@@ -43,11 +45,17 @@ interface CommandPaletteProps {
   onJumpTo: (sectionId: string) => void;
 }
 
-const JUMP_TARGETS: Array<{ id: string; label: string; icon: 'clock' | 'calendar' | 'droplet' | 'gauge' | 'sparkle' }> = [
+const JUMP_TARGETS: Array<{
+  id: string;
+  label: string;
+  icon: 'clock' | 'calendar' | 'droplet' | 'gauge' | 'sparkle' | 'sky' | 'time';
+}> = [
   { id: 'hourly', label: 'Hourly forecast', icon: 'clock' },
   { id: 'daily', label: '7-day forecast', icon: 'calendar' },
   { id: 'air', label: 'Air quality', icon: 'droplet' },
+  { id: 'sky', label: 'Sky & photography', icon: 'sky' },
   { id: 'details', label: 'Weather details', icon: 'gauge' },
+  { id: 'timemachine', label: 'Time machine', icon: 'time' },
   { id: 'advisor', label: 'Smart advisor', icon: 'sparkle' },
 ];
 
@@ -57,6 +65,8 @@ const ICON_NAMES = {
   droplet: 'droplet',
   gauge: 'gauge',
   sparkle: 'sparkle',
+  sky: 'moon-phase',
+  time: 'sunset',
 } as const;
 
 export function CommandPalette(props: CommandPaletteProps) {
@@ -68,10 +78,12 @@ export function CommandPalette(props: CommandPaletteProps) {
     activeCitySaved,
     units,
     theme,
+    mapOpen,
     onSelectCity,
     onToggleUnits,
     onSetTheme,
     onAskAi,
+    onToggleMap,
     onLocate,
     locating,
     onSaveCurrentCity,
@@ -221,6 +233,14 @@ export function CommandPalette(props: CommandPaletteProps) {
                   >
                     <Icon name="sparkle" size={16} className="shrink-0 text-aurora-400" />
                     Ask AI about the weather
+                  </CommandItem>
+                  <CommandItem
+                    value="map"
+                    onSelect={() => run(onToggleMap)}
+                    className="rounded-xl text-surface aria-selected:bg-aurora-500/15"
+                  >
+                    <Icon name="map" size={16} className="shrink-0 text-aurora-400" />
+                    {mapOpen ? 'Close map' : 'Open map'}
                   </CommandItem>
                 </CommandGroup>
 

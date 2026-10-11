@@ -2,16 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { UIEvent } from 'react';
+import dynamic from 'next/dynamic';
 import { useToast } from '@/hooks/use-toast';
 import { useGeolocation } from '@/hooks/use-geolocation';
 import { usePreferences } from '@/hooks/use-preferences';
 import { useWeather } from '@/hooks/use-weather';
+import { useAmbientSound } from '@/hooks/use-ambient-sound';
+import { useAchievementObserver } from '@/hooks/use-achievements';
+import { loadCachedBundle } from '@/lib/sections';
 import { getScene } from '@/lib/scenes';
 import { getDayPhase } from '@/lib/time';
-import type { City, Condition, DayPhase } from '@/types/weather';
+import type { City, Condition, DayPhase, WeatherBundle } from '@/types/weather';
 import { Glass } from '@/components/glass/Glass';
 import { Icon } from '@/components/icons/Icon';
 import { AlertDigest } from '@/components/ai/AlertDigest';
+import { OfficialAlerts } from '@/components/alerts/OfficialAlerts';
 import { AskAIPanel } from '@/components/ai/AskAIPanel';
 import { BriefingCard } from '@/components/ai/BriefingCard';
 import { CitiesSidebar } from '@/components/layout/CitiesSidebar';
@@ -25,13 +30,19 @@ import { WeatherScene } from '@/components/weather/WeatherScene';
 import { CurrentWeather } from '@/components/weather/CurrentWeather';
 import { ForecastSections } from '@/components/weather/ForecastSections';
 import { SavedCities } from '@/components/weather/SavedCities';
-import { EmptyState, ErrorState, LoadingSkeletons, OfflineBanner } from '@/components/weather/StateViews';
+import { EmptyState, ErrorState, LoadingSkeletons, OfflineBanner, StaleDataBanner } from '@/components/weather/StateViews';
 import { SiteFooter } from '@/components/weather/SiteFooter';
 
 const CONDITIONS: Condition[] = [
   'clear', 'partly-cloudy', 'cloudy', 'fog', 'drizzle', 'rain', 'snow', 'thunder',
 ];
 const PHASES: DayPhase[] = ['night', 'dawn', 'day', 'dusk'];
+
+// Map mode is heavy (maplibre-gl + tiles) — load it only when first opened.
+const MapOverlay = dynamic(() => import('@/components/map/MapOverlay'), {
+  ssr: false,
+  loading: () => null,
+});
 
 export function AetherApp() {
   const [mounted, setMounted] = useState(false);
@@ -46,9 +57,18 @@ export function AetherApp() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
   const [dockTab, setDockTab] = useState<DockTab>('today');
   const [scrolled, setScrolled] = useState(false);
   const [drawerSnap, setDrawerSnap] = useState<number>(DRAWER_SNAPS[0]);
+
+  // Offline weather cache (Task 20-b): shown when the fetch fails.
+  const [cachedWeather, setCachedWeather] = useState<{
+    bundle: WeatherBundle;
+    savedAt: number;
+  } | null>(null);
+  const [staleBannerDismissed, setStaleBannerDismissed] = useState(false);
+  const staleToastRef = useRef(false);
 
   const restoredRef = useRef(false);
   const mainScrollRef = useRef<HTMLElement | null>(null);
@@ -61,9 +81,15 @@ export function AetherApp() {
   const lastCity = usePreferences((state) => state.lastCity);
   const { setUnits, toggleUnits, setTheme, saveCity, removeCity, setLastCity } =
     usePreferences.getState();
+  const accent = usePreferences((state) => state.accent);
 
   const weather = useWeather(activeCity);
-  const bundle = weather.data ?? null;
+  const liveBundle = weather.data ?? null;
+  // Offline fallback: when the fetch fails and a cached bundle exists, the
+  // cache becomes the displayed bundle (existing stale-data preservation —
+  // TanStack placeholderData + the toast below — is untouched).
+  const bundle = liveBundle ?? (weather.isError ? cachedWeather?.bundle ?? null : null);
+  const usingCachedBundle = liveBundle == null && bundle != null;
 
   // Hydration-safe mount + restore the last visited city once.
   useEffect(() => {
@@ -100,6 +126,34 @@ export function AetherApp() {
       window.removeEventListener('offline', goOffline);
     };
   }, []);
+
+  // Offline cache lifecycle: reset per city, read from localStorage only
+  // after a fetch error (hydration-safe — never during render).
+  useEffect(() => {
+    setCachedWeather(null);
+    setStaleBannerDismissed(false);
+  }, [activeCity?.id]);
+
+  useEffect(() => {
+    if (!activeCity || !weather.isError || liveBundle != null || cachedWeather) return;
+    const cached = loadCachedBundle<WeatherBundle>(activeCity);
+    if (cached) setCachedWeather({ bundle: cached.bundle, savedAt: cached.savedAt });
+  }, [activeCity, weather.isError, liveBundle, cachedWeather]);
+
+  // Refetch failed while live data is on screen → keep it, toast once.
+  useEffect(() => {
+    if (weather.isError && liveBundle != null) {
+      if (!staleToastRef.current) {
+        staleToastRef.current = true;
+        toast({
+          title: 'Showing last seen data',
+          description: 'The weather service is unreachable — the forecast below is the latest successful update.',
+        });
+      }
+    } else if (!weather.isError) {
+      staleToastRef.current = false;
+    }
+  }, [weather.isError, liveBundle, toast]);
 
   // ⌘K / Ctrl+K — Spotlight.
   useEffect(() => {
@@ -148,6 +202,17 @@ export function AetherApp() {
   // Auto follows the scene; manual picks force the surface tokens.
   const surfaceMode = theme === 'auto' ? scene.surface : theme;
   const tint = sceneOverride?.condition ?? bundle?.current.condition ?? 'clear';
+  const ambientPhase = sceneOverride?.phase ?? dayPhase;
+
+  // Task 20-b: synthesized ambience (needs condition + day phase) and the
+  // achievement observer (scene condition, saved count, map open — plus
+  // the impulsive custom events from ForecastSections / ShareCardButton).
+  useAmbientSound(tint, ambientPhase);
+  useAchievementObserver({
+    condition: tint,
+    savedCount: savedCities.length,
+    mapOpen,
+  });
 
   // Keep the page background in sync with the scene (overscroll areas).
   useEffect(() => {
@@ -223,6 +288,27 @@ export function AetherApp() {
     }
   }, []);
 
+  // ------------------------------- Map mode ------------------------------ //
+  const handleToggleMap = useCallback(() => {
+    if (mapOpen) {
+      setMapOpen(false);
+      setDockTab('today');
+    } else {
+      setMapOpen(true);
+      setDockTab('map');
+    }
+  }, [mapOpen]);
+
+  const handleCloseMap = useCallback(() => {
+    setMapOpen(false);
+    setDockTab('today');
+  }, []);
+
+  const handleDockTab = useCallback((tab: DockTab) => {
+    setDockTab(tab);
+    setMapOpen(tab === 'map');
+  }, []);
+
   const statusText = !mounted
     ? ''
     : !activeCity
@@ -251,11 +337,19 @@ export function AetherApp() {
     <div
       data-surface={surfaceMode}
       data-tint={tint}
+      data-accent={mounted ? accent : 'aurora'}
       className="relative flex min-h-screen flex-col lg:h-screen lg:min-h-0 lg:overflow-hidden"
     >
       <WeatherScene scene={scene} />
 
-      {!online && <OfflineBanner />}
+      {usingCachedBundle && !staleBannerDismissed && cachedWeather ? (
+        <StaleDataBanner
+          savedAt={cachedWeather.savedAt}
+          onDismiss={() => setStaleBannerDismissed(true)}
+        />
+      ) : (
+        !online && <OfflineBanner />
+      )}
 
       <MenuBar
         city={activeCity}
@@ -263,10 +357,12 @@ export function AetherApp() {
         units={units}
         scrolled={scrolled}
         aiOpen={aiOpen}
+        mapOpen={mapOpen}
         locating={locating}
         onToggleUnits={toggleUnits}
         onOpenPalette={() => setPaletteOpen(true)}
         onToggleAi={handleAskAi}
+        onToggleMap={handleToggleMap}
         onOpenSettings={() => setSettingsOpen(true)}
         onLocate={handleLocate}
       />
@@ -305,6 +401,9 @@ export function AetherApp() {
                         onRefresh={() => weather.refetch()}
                         refreshing={weather.isFetching}
                       />
+                      <div className="mt-4">
+                        <OfficialAlerts city={activeCity} bundle={bundle} />
+                      </div>
                       <div className="mt-4">
                         <BriefingCard city={activeCity} units={units} />
                       </div>
@@ -375,6 +474,9 @@ export function AetherApp() {
                       onRefresh={() => weather.refetch()}
                       refreshing={weather.isFetching}
                     />
+                    <div className="mt-4">
+                      <OfficialAlerts city={activeCity} bundle={bundle} />
+                    </div>
                     <BriefingCard city={activeCity} units={units} />
                     <AlertDigest city={activeCity} units={units} />
                     <ForecastSections city={activeCity} bundle={bundle} units={units} />
@@ -405,12 +507,13 @@ export function AetherApp() {
       </div>
 
       {/* Mobile dock */}
-      <MobileDock active={dockTab} onChange={setDockTab} />
+      <MobileDock active={dockTab} onChange={handleDockTab} />
 
       {/* Mobile forecast drawer — Today tab with data */}
       {dockTab === 'today' && activeCity && bundle && (
         <div className="lg:hidden">
           <ForecastDrawer snapPoint={drawerSnap} onSnapPointChange={setDrawerSnap}>
+            <OfficialAlerts city={activeCity} bundle={bundle} />
             <ForecastSections city={activeCity} bundle={bundle} units={units} />
             <SiteFooter />
           </ForecastDrawer>
@@ -425,10 +528,12 @@ export function AetherApp() {
         activeCitySaved={isSaved}
         units={units}
         theme={theme}
+        mapOpen={mapOpen}
         onSelectCity={selectCity}
         onToggleUnits={toggleUnits}
         onSetTheme={setTheme}
         onAskAi={handleAskAi}
+        onToggleMap={handleToggleMap}
         onLocate={handleLocate}
         locating={locating}
         onSaveCurrentCity={handleToggleSave}
@@ -444,6 +549,16 @@ export function AetherApp() {
         theme={theme}
         onSetTheme={setTheme}
       />
+
+      {/* Full-screen Map mode overlay (client-only, lazy) */}
+      {mapOpen && (
+        <MapOverlay
+          onClose={handleCloseMap}
+          city={activeCity}
+          units={units}
+          surface={surfaceMode}
+        />
+      )}
 
       <p role="status" aria-live="polite" className="sr-only">
         {statusText}

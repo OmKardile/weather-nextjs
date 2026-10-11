@@ -8,11 +8,12 @@ import { cn } from '@/lib/utils';
 
 /* ================================================================== */
 /* MobileDock — floating glass nav (macOS dock feel).                  */
-/* Today · Cities · Ask AI · Settings. Icons magnify on pointer hover  */
-/* (desktop-width breakpoints); active tab gets a sliding aurora pill. */
+/* Today · Map · Ask AI · Cities · Settings. Icons magnify on pointer */
+/* hover (desktop-width breakpoints); active tab gets a sliding       */
+/* aurora pill. The Map tab opens the full-screen map overlay.        */
 /* ================================================================== */
 
-export type DockTab = 'today' | 'cities' | 'ai' | 'settings';
+export type DockTab = 'today' | 'map' | 'cities' | 'ai' | 'settings';
 
 interface MobileDockProps {
   active: DockTab;
@@ -22,8 +23,9 @@ interface MobileDockProps {
 
 const ITEMS: Array<{ id: DockTab; label: string; icon: Parameters<typeof Icon>[0]['name'] }> = [
   { id: 'today', label: 'Today', icon: 'sun' },
-  { id: 'cities', label: 'Cities', icon: 'pin' },
+  { id: 'map', label: 'Map', icon: 'map' },
   { id: 'ai', label: 'Ask AI', icon: 'sparkle' },
+  { id: 'cities', label: 'Cities', icon: 'pin' },
   { id: 'settings', label: 'Settings', icon: 'gear' },
 ];
 

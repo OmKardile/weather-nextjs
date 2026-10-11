@@ -3,16 +3,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, KeyboardEvent } from 'react';
 import { AiBadge, MarkdownLite, StreamingCursor } from '@/components/ai/ai-shared';
+import { PlannerPanel } from '@/components/ai/PlannerPanel';
 import { Icon } from '@/components/icons/Icon';
 import { useAiChat } from '@/hooks/use-ai-chat';
 import type { UiChatMessage } from '@/hooks/use-ai-chat';
+import { usePreferences } from '@/hooks/use-preferences';
 import { formatTemp } from '@/lib/units';
 import { conditionLabel } from '@/lib/wmo';
 import { cn } from '@/lib/utils';
 import type { City, Units, WeatherBundle } from '@/types/weather';
 
 /* ================================================================== */
-/* AskAIPanel — chat with Aether (desktop inspector / mobile sheet)    */
+/* AskAIPanel — chat with Aether (desktop inspector / mobile sheet).    */
+/* Two modes: Chat (streaming Q&A) and Planner (day windows).           */
 /* ================================================================== */
 
 interface AskAIPanelProps {
@@ -27,17 +30,28 @@ const INPUT_BUDGET = 600;
 const COUNTER_FROM = 540;
 const SCROLL_STICK_THRESHOLD = 40;
 
+type PanelMode = 'chat' | 'planner';
+
+const MODES: Array<{ id: PanelMode; label: string }> = [
+  { id: 'chat', label: 'Chat' },
+  { id: 'planner', label: 'Planner' },
+];
+
 /** Default pool + replacements for weather-aware suggestions. */
 const DEFAULT_SUGGESTIONS = [
+  'Best 2h window for a run?',
+  'Will laundry dry today?',
   'Should I run tomorrow morning?',
-  'Will my laundry dry outside today?',
   'Best 2-hour window for a walk?',
 ] as const;
 
 export function AskAIPanel({ city, units, bundle, className, onClose }: AskAIPanelProps): JSX.Element {
+  const aiVoice = usePreferences((s) => s.aiVoice);
+  const [mode, setMode] = useState<PanelMode>('chat');
   const { messages, status, provider, lastError, send, stop, regenerate, reset } = useAiChat({
     city,
     units,
+    voice: aiVoice,
   });
 
   const [value, setValue] = useState('');
@@ -144,22 +158,24 @@ export function AskAIPanel({ city, units, bundle, className, onClose }: AskAIPan
       {/* Header */}
       <header className="glass border-x-0 border-t-0 border-b border-surface px-4 pb-3 pt-4">
         <div className="flex items-center gap-2">
-          <Icon name="sparkle" size={15} className="text-aurora-500" />
+          <Icon name="sparkle" size={15} className="shrink-0 text-aurora-500" />
           <h2 className="font-display text-sm font-semibold text-surface">Ask Aether</h2>
-          <AiBadge provider={provider} />
+          {mode === 'chat' ? <AiBadge provider={provider} /> : null}
           <div className="ml-auto flex items-center gap-1">
-            <button
-              type="button"
-              onClick={regenerate}
-              disabled={!canRegenerate}
-              aria-label="Regenerate last reply"
-              className={cn(
-                'focus-ring rounded-full p-1.5 text-surface-muted transition-colors hover:text-surface',
-                'disabled:pointer-events-none disabled:opacity-35',
-              )}
-            >
-              <Icon name="refresh" size={15} />
-            </button>
+            {mode === 'chat' ? (
+              <button
+                type="button"
+                onClick={regenerate}
+                disabled={!canRegenerate}
+                aria-label="Regenerate last reply"
+                className={cn(
+                  'focus-ring rounded-full p-1.5 text-surface-muted transition-colors hover:text-surface',
+                  'disabled:pointer-events-none disabled:opacity-35',
+                )}
+              >
+                <Icon name="refresh" size={15} />
+              </button>
+            ) : null}
             {onClose ? (
               <button
                 type="button"
@@ -172,9 +188,41 @@ export function AskAIPanel({ city, units, bundle, className, onClose }: AskAIPan
             ) : null}
           </div>
         </div>
-        <p className="mt-1 truncate text-xs text-surface-muted">{contextLine}</p>
+        <div className="mt-1 flex items-center gap-2">
+          <p className="min-w-0 flex-1 truncate text-xs text-surface-muted">{contextLine}</p>
+          <div
+            role="group"
+            aria-label="Ask AI mode"
+            className="glass-subtle flex h-7 shrink-0 items-center rounded-full p-0.5"
+          >
+            {MODES.map((m) => {
+              const active = mode === m.id;
+              return (
+                <button
+                  key={m.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={active ? undefined : () => setMode(m.id)}
+                  className={cn(
+                    'focus-ring h-6 rounded-full px-2.5 text-[11px] font-semibold transition-all duration-200',
+                    active
+                      ? 'bg-aurora-500 text-[#04211C] shadow-[0_0_14px_-4px_rgb(34_188_160/0.8)]'
+                      : 'text-surface-muted hover:text-surface',
+                  )}
+                >
+                  {m.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
       </header>
 
+      {/* Mode body — chat keeps its hook state while planner is open */}
+      {mode === 'planner' ? (
+        <PlannerPanel city={city} units={units} voice={aiVoice} className="min-h-0 flex-1" />
+      ) : (
+        <>
       {/* Messages */}
       <div
         ref={scrollRef}
@@ -304,6 +352,8 @@ export function AskAIPanel({ city, units, bundle, className, onClose }: AskAIPan
           </p>
         ) : null}
       </div>
+        </>
+      )}
     </div>
   );
 }

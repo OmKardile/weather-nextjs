@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { saveCachedBundle } from '@/lib/sections';
 import type { City, WeatherBundle } from '@/types/weather';
 
 const roundCoord = (value: number) => Math.round(value * 1000) / 1000;
@@ -22,7 +23,12 @@ export function useWeather(city: City | null) {
         const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? `Request failed (${res.status})`);
       }
-      return (await res.json()) as WeatherBundle;
+      const bundle = (await res.json()) as WeatherBundle;
+      // Offline cache (Task 20-b): persist the last successful bundle for
+      // this city (≤5 cities, oldest pruned) so a failed reload can fall
+      // back to it. Runs client-side only — queryFn never executes on SSR.
+      if (city) saveCachedBundle(city, bundle);
+      return bundle;
     },
     enabled: city != null,
     staleTime: 10 * 60_000,

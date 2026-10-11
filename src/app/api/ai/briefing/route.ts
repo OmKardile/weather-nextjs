@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { AiProvider, AiStreamEvent } from '@/types/ai';
+import { AI_VOICE_IDS } from '@/types/ai';
 import {
   CACHE_TTL,
   NoProviderError,
@@ -28,6 +29,7 @@ const payloadSchema = z.object({
     longitude: z.number().min(-180).max(180),
   }),
   units: z.enum(['metric', 'imperial']).default('metric'),
+  voice: z.enum(AI_VOICE_IDS).default('pro'),
 });
 
 export async function POST(req: Request) {
@@ -43,8 +45,8 @@ export async function POST(req: Request) {
     return aiErrorResponse('Invalid request.', 400);
   }
 
-  const { city, units } = payload;
-  const cacheKey = `brief:${city.latitude.toFixed(2)},${city.longitude.toFixed(2)}:${units}`;
+  const { city, units, voice } = payload;
+  const cacheKey = `brief:${city.latitude.toFixed(2)},${city.longitude.toFixed(2)}:${units}:${voice}`;
   const cached = cacheGet(cacheKey, CACHE_TTL.briefing);
   const signal = requestSignal(req);
 
@@ -70,7 +72,7 @@ export async function POST(req: Request) {
     let text = '';
     try {
       for await (const part of streamText({
-        system: briefingSystemPrompt(context),
+        system: briefingSystemPrompt(context, voice),
         user: `Write today's briefing for ${city.name}.`,
         maxOutputTokens: 220,
         temperature: 0.6,

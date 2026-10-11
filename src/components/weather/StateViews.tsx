@@ -135,3 +135,39 @@ export function OfflineBanner() {
     </div>
   );
 }
+
+interface StaleDataBannerProps {
+  /** Epoch ms when the shown bundle was last fetched successfully. */
+  savedAt: number;
+  onDismiss: () => void;
+}
+
+/**
+ * Amber offline banner for the Task 20-b weather cache: shown when the
+ * fetch failed and a cached bundle is being displayed instead. Dismissable
+ * (unlike the plain OfflineBanner, which follows the browser online state).
+ */
+export function StaleDataBanner({ savedAt, onDismiss }: StaleDataBannerProps) {
+  const ageMinutes = Math.floor(Math.max(Date.now() - savedAt, 0) / 60_000);
+  const ageText = ageMinutes < 1 ? 'just now' : ageMinutes < 60 ? `${ageMinutes}m` : `${Math.floor(ageMinutes / 60)}h`;
+
+  return (
+    <div
+      role="status"
+      className="sticky top-16 z-30 mx-auto flex w-fit items-center gap-2 rounded-full border border-amber-400/45 bg-[rgb(24_17_6/0.82)] px-4 py-2 text-xs font-medium text-amber-200 shadow-[var(--shadow-glass)] backdrop-blur-md"
+    >
+      <WifiOff className="h-3.5 w-3.5" aria-hidden="true" />
+      Offline — last seen {ageText} ago
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss offline banner"
+        className="-mr-1 ml-1 flex h-5 w-5 items-center justify-center rounded-full text-amber-200/80 transition-colors duration-200 hover:text-amber-100"
+      >
+        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden="true">
+          <path d="M6 6l12 12M18 6 6 18" />
+        </svg>
+      </button>
+    </div>
+  );
+}

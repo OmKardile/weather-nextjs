@@ -1,7 +1,7 @@
 import 'server-only';
 
-import type { Units, WeatherBundle } from '@/types/weather';
-import type { ActivityScore, AlertItem, OutfitSuggestion } from '@/types/ai';
+import type { Condition, Units, WeatherBundle } from '@/types/weather';
+import type { ActivityScore, AlertItem, OutfitSuggestion, PlannerWindow } from '@/types/ai';
 import { conditionLabel } from '@/lib/wmo';
 import { formatHour, formatTemp, formatWind } from '@/lib/units';
 import { getMoonPhase } from '@/lib/moon';
@@ -126,6 +126,20 @@ export function fallbackActivities(bundle: WeatherBundle): ActivityScore[] {
     ? clamp((100 - nightCloud) * 0.55 + (100 - nightPrecip) * 0.4 - moonPenalty)
     : 0;
 
+  // Laundry: outdoor drying — dry hours, daytime warmth, helpful breeze,
+  // humidity (current relative humidity as the proxy — no hourly series).
+  const dryHours12 = next12.filter((h) => h.precipitationProbability <= 10).length;
+  const dayHours12 = next12.filter((h) => h.isDay).length;
+  const humidity = current.humidity;
+  const humidityPenalty = humidity > 70 ? (humidity - 70) * 1.2 : 0;
+  const laundry = clamp(
+    (dryHours12 / Math.max(next12.length, 1)) * 46 +
+      Math.min(24, Math.max(0, avgTemp - 5) * 1.4) +
+      Math.min(16, Math.max(0, avgWind - 4) * 0.9) +
+      (dayHours12 >= 6 ? 12 : dayHours12 * 2) -
+      humidityPenalty,
+  );
+
   const t = (c: number) => Math.round(c);
   return [
     {
@@ -154,6 +168,16 @@ export function fallbackActivities(bundle: WeatherBundle): ActivityScore[] {
       reason: nightHours.length
         ? `${Math.round(nightCloud)}% cloud tonight, ${moon.name.toLowerCase()} (${Math.round(moon.illumination * 100)}% lit).`
         : 'Daylight hours only in the current forecast window.',
+    },
+    {
+      activity: 'laundry',
+      score: laundry,
+      reason:
+        dryHours12 >= 10 && humidity < 70
+          ? `Dry stretch — ${dryHours12} of 12 hours under 10% precip, ${Math.round(avgWind)} km/h breeze.`
+          : dryHours12 >= 8
+            ? `Mostly dry (${dryHours12}/12 hours), ${Math.round(humidity)}% humidity — decent drying.`
+            : `Only ${dryHours12} of 12 hours look dry — indoor drying is safer today.`,
     },
   ];
 }
@@ -259,4 +283,248 @@ function titleFor(fact: string): string {
   if (/Temperature swings/i.test(fact)) return 'Big temp swing';
   if (/precipitation/i.test(fact)) return 'Wet window';
   return 'Heads up';
+}
+
+/* ------------------------------------------------------------------ */
+/* Weather story — deterministic 4–6 sentence narrative of the next 24h */
+/* ------------------------------------------------------------------ */
+
+const STORY_OPENINGS: Record<Condition, (isDay: boolean) => string> = {
+  clear: (isDay) =>
+    isDay
+      ? 'The day opens bright and unhurried, sunlight leaning warm through the morning.'
+      : 'A clear, quiet kind of night — the sky wide open overhead.',
+  'partly-cloudy': () => 'Clouds and sun trade places through the day, neither one winning for long.',
+  cloudy: () => 'A soft grey ceiling settles in, the light diffused and easy on the eyes.',
+  fog: () => 'The morning arrives wrapped in fog, the world narrowed to a few soft steps.',
+  drizzle: () => 'A fine drizzle stitches the hours together, more atmosphere than weather.',
+  rain: () => 'Rain sets the pace early, steady and businesslike about it.',
+  snow: () => 'Snow gentles everything down, hushing the streets one flake at a time.',
+  thunder: () => 'The sky has a temper today — a storm grumbling somewhere in the forecast.',
+};
+
+export function fallbackStory(bundle: WeatherBundle, units: Units): string {
+  const { current, hourly, daily } = bundle;
+  const next12 = hourly.slice(0, 12);
+  const sentences: string[] = [];
+
+  // 1. Opening line by current condition.
+  sentences.push(STORY_OPENINGS[current.condition](current.isDay));
+
+  // 2. Temperature rhythm over the next 12 hours.
+  if (next12.length >= 2) {
+    const first = next12[0].temperature;
+    const last = next12[next12.length - 1].temperature;
+    const peak = Math.max(...next12.map((h) => h.temperature));
+    if (Math.abs(last - first) < 2) {
+      sentences.push(`Temperatures hold near ${formatTemp(first, units)} through the afternoon.`);
+    } else if (last > first) {
+      sentences.push(`Warmth builds slowly, ${formatTemp(first, units)} easing toward ${formatTemp(peak, units)}.`);
+    } else {
+      sentences.push(`The warmth slips away as the hours pass, from ${formatTemp(first, units)} down toward ${formatTemp(last, units)}.`);
+    }
+  }
+
+  // 3. Precipitation timing — the day's turning point.
+  const rainHour = next12.find((h) => h.precipitationProbability >= 50);
+  const dampEarly = next12.slice(0, 4).some((h) => h.precipitationProbability >= 40);
+  const driesOut = dampEarly && !next12.slice(4).some((h) => h.precipitationProbability >= 40);
+  if (driesOut) {
+    const dryFrom = next12.slice(4).find((h) => h.precipitationProbability < 40) ?? next12[4];
+    sentences.push(`The last of the damp burns off by ${formatHour(dryFrom.time, units)}, leaving the afternoon to itself.`);
+  } else if (rainHour) {
+    sentences.push(`Showers gather around ${formatHour(rainHour.time, units)} — worth being under a roof by then.`);
+  } else {
+    sentences.push('The air stays dry, nothing more than a passing cloud all day.');
+  }
+
+  // 4. Wind, when it has a say.
+  if (current.windSpeed >= 30) {
+    sentences.push(`Wind keeps things moving at ${formatWind(current.windSpeed, units)}.`);
+  }
+
+  // 5. Closing line — the day letting go.
+  const sunset = daily[0]?.sunset;
+  if (sunset) {
+    sentences.push(`The light lets go around ${formatHour(sunset, units)}, and the evening settles in softly.`);
+  }
+
+  return sentences.slice(0, 6).join(' ');
+}
+
+/* ------------------------------------------------------------------ */
+/* Day planner — deterministic keyword-driven window search             */
+/* ------------------------------------------------------------------ */
+
+interface PlannerActivity {
+  key: 'walk' | 'run' | 'drive' | 'laundry' | 'photos' | 'outdoor';
+  label: string;
+}
+
+function detectPlannerActivities(text: string): PlannerActivity[] {
+  const t = text.toLowerCase();
+  const found: PlannerActivity[] = [];
+  const wants = (re: RegExp) => re.test(t);
+  if (wants(/\b(walk|walks|walking|stroll|strolls|strolling|hike|hiking)\b/)) {
+    found.push({ key: 'walk', label: 'Walk' });
+  }
+  if (wants(/\b(run|runs|running|jog|jogging)\b/)) {
+    found.push({ key: 'run', label: 'Run' });
+  }
+  if (wants(/\b(drive|drives|driving|road\s?trip|commute|commuting|trip|travel|traveling|travelling)\b/)) {
+    found.push({ key: 'drive', label: 'Drive' });
+  }
+  if (wants(/\b(laundry|laundries|washing|wash|dry|drying|clothes|clothesline)\b/)) {
+    found.push({ key: 'laundry', label: 'Laundry' });
+  }
+  if (wants(/\b(photo|photos|photograph|photographs|photography|pictures?|golden\s?hour|sunset|sunrise)\b/)) {
+    found.push({ key: 'photos', label: 'Photos' });
+  }
+  if (!found.length) found.push({ key: 'outdoor', label: 'Outdoor time' });
+  return found.slice(0, 4);
+}
+
+const hhmmToMinutes = (hhmm: string): number => {
+  const [h, m] = hhmm.split(':').map(Number);
+  return (h || 0) * 60 + (m || 0);
+};
+
+/** Score one 2-hour window (hour i, i+1) for an activity key. -1 = not viable. */
+function scorePlannerWindow(
+  key: PlannerActivity['key'],
+  hours: WeatherBundle['hourly'],
+  i: number,
+  sunriseMin: number | null,
+  sunsetMin: number | null,
+): number {
+  const a = hours[i];
+  const b = hours[i + 1];
+  const prob = (a.precipitationProbability + b.precipitationProbability) / 2;
+  const tempC = (a.temperature + b.temperature) / 2;
+  const wind = (a.windSpeed + b.windSpeed) / 2;
+  const uv = Math.max(a.uvIndex, b.uvIndex);
+  const bothDay = a.isDay && b.isDay;
+
+  switch (key) {
+    case 'walk':
+      return clamp(100 - prob * 0.7 - Math.abs(tempC - 18) * 3 - Math.max(0, wind - 25) * 1.5);
+    case 'run':
+      return clamp(100 - prob * 0.8 - Math.abs(tempC - 12) * 3 - Math.max(0, wind - 22) * 1.5 - Math.max(0, uv - 7) * 5);
+    case 'drive': {
+      const visKm = ((a.visibility || 0) + (b.visibility || 0)) / 2000;
+      return clamp(100 - prob * 0.5 - Math.max(0, 10 - visKm) * 1.5 - Math.max(0, wind - 35) * 1.2);
+    }
+    case 'laundry': {
+      // Viable only when the window is dry AND the next 6 hours stay rain-free.
+      const windowDry = a.precipitationProbability === 0 && b.precipitationProbability === 0;
+      const followRain = hours
+        .slice(i + 2, i + 8)
+        .some((h) => h.precipitationProbability >= 40);
+      if (!windowDry || followRain) return -1;
+      return clamp(
+        42 + Math.min(30, Math.max(0, tempC - 8) * 1.6) + Math.min(18, wind * 0.9) + (bothDay ? 10 : 0),
+      );
+    }
+    case 'photos': {
+      const start = hhmmToMinutes(a.time.slice(11, 16));
+      const golden =
+        sunriseMin != null && sunsetMin != null
+          ? Math.abs(start - sunriseMin) <= 60 || Math.abs(start - sunsetMin) <= 60
+          : false;
+      const clear = a.condition === 'clear' || b.condition === 'clear';
+      return clamp((golden ? 84 : clear ? 70 : 52) - prob * 0.5 - Math.max(0, wind - 30));
+    }
+    case 'outdoor':
+    default:
+      return clamp(100 - prob * 0.8 - Math.abs(tempC - 20) * 2.5 - Math.max(0, wind - 30) * 1.4);
+  }
+}
+
+function plannerReason(
+  key: PlannerActivity['key'],
+  hours: WeatherBundle['hourly'],
+  i: number,
+  units: Units,
+): string {
+  const a = hours[i];
+  const b = hours[i + 1];
+  const prob = Math.round((a.precipitationProbability + b.precipitationProbability) / 2);
+  const tempAvg = (a.temperature + b.temperature) / 2;
+  const wind = Math.round((a.windSpeed + b.windSpeed) / 2);
+  const timeLabel = formatHour(a.time, units);
+  switch (key) {
+    case 'walk':
+      return `${prob}% precip around ${timeLabel}, ${formatTemp(tempAvg, units)} and ${formatWind(wind, units)} wind.`;
+    case 'run':
+      return prob >= 40
+        ? `Cool ${formatTemp(tempAvg, units)} with ${prob}% precip — mind the showers.`
+        : `Cool ${formatTemp(tempAvg, units)} with ${prob}% precip — easy running conditions.`;
+    case 'drive': {
+      const visKm = Math.round(((a.visibility || 0) + (b.visibility || 0)) / 2000);
+      return `${prob}% precip and ${visKm >= 10 ? '10+ km' : `${visKm} km`} visibility — easy roads.`;
+    }
+    case 'laundry': {
+      const dryAhead = hours
+        .slice(i, i + 8)
+        .every((h) => h.precipitationProbability < 40);
+      return dryAhead
+        ? `0% precip in this window and rain-free for the following hours — good drying at ${formatTemp(tempAvg, units)}.`
+        : `Dry window at ${timeLabel}, ${formatTemp(tempAvg, units)} — hang it early.`;
+    }
+    case 'photos':
+      return `Best light near ${timeLabel} — ${prob}% precip, ${a.condition === 'clear' || b.condition === 'clear' ? 'clear skies' : 'workable skies'}.`;
+    case 'outdoor':
+    default:
+      return `Driest stretch — ${prob}% precip around ${timeLabel}, ${formatTemp(tempAvg, units)}.`;
+  }
+}
+
+export function fallbackPlanner(text: string, bundle: WeatherBundle, units: Units): PlannerWindow[] {
+  const hours = bundle.hourly.slice(0, 24);
+  if (hours.length < 2) return [];
+
+  const today = bundle.daily[0];
+  const sunriseMin = today?.sunrise ? hhmmToMinutes(today.sunrise.slice(11, 16)) : null;
+  const sunsetMin = today?.sunset ? hhmmToMinutes(today.sunset.slice(11, 16)) : null;
+
+  const used: Array<[number, number]> = []; // [startIdx, endIdx] already suggested
+  const overlapsUsed = (i: number) => used.some(([s, e]) => i >= s && i <= e);
+
+  const windows: PlannerWindow[] = [];
+  for (const activity of detectPlannerActivities(text)) {
+    let bestIdx = -1;
+    let bestScore = -1;
+    let bestFreeIdx = -1; // best non-overlapping candidate, even if worse
+    let bestFreeScore = -1;
+
+    for (let i = 0; i + 1 < hours.length; i++) {
+      const score = scorePlannerWindow(activity.key, hours, i, sunriseMin, sunsetMin);
+      if (score < 0) continue;
+      if (score > bestScore) {
+        bestScore = score;
+        bestIdx = i;
+      }
+      if (!overlapsUsed(i) && score > bestFreeScore) {
+        bestFreeScore = score;
+        bestFreeIdx = i;
+      }
+    }
+
+    if (bestIdx < 0) continue; // no viable window at all (e.g. laundry never dry)
+    // Prefer a non-overlapping window when it's within 25 points of the best.
+    const idx = bestFreeIdx >= 0 && (overlapsUsed(bestIdx) || bestScore - bestFreeScore <= 25) ? bestFreeIdx : bestIdx;
+    used.push([idx - 1, idx + 2]);
+
+    const from = hours[idx].time.slice(11, 16);
+    const to = (hours[Math.min(idx + 2, hours.length - 1)] ?? hours[idx + 1]).time.slice(11, 16);
+    windows.push({
+      activity: activity.label,
+      from,
+      to,
+      score: Math.max(bestScore, 1),
+      reason: plannerReason(activity.key, hours, idx, units),
+    });
+  }
+
+  return windows.slice(0, 4);
 }

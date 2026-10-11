@@ -1,0 +1,744 @@
+     1→import dns from 'node:dns';
+     2→import net from 'node:net';
+     3→import type {
+     4→  AirQuality,
+     5→  City,
+     6→  DailyPoint,
+     7→  EnsembleHourly,
+     8→  EnsembleResponse,
+     9→  FloodDay,
+    10→  FloodResponse,
+    11→  HistoricalResponse,
+    12→  HistoricalYear,
+    13→  HourlyPoint,
+    14→  MarineDay,
+    15→  MarineResponse,
+    16→  MinutelyPoint,
+    17→  ModelHourlyPoint,
+    18→  ModelsResponse,
+    19→  Pollen,
+    20→  WeatherBundle,
+    21→} from '@/types/weather';
+    22→import { conditionOf } from '@/lib/wmo';
+    23→
+    24→// Some networks advertise flaky IPv6 routes for upstream APIs; prefer IPv4
+    25→// (undici ignores dns result ordering, so enable auto-select too).
+    26→dns.setDefaultResultOrder('ipv4first');
+    27→if (typeof net.setDefaultAutoSelectFamily === 'function') {
+    28→  net.setDefaultAutoSelectFamily(true);
+    29→}
+    30→
+    31→/**
+    32→ * Server-side Open-Meteo client. All values are requested in metric and
+    33→ * converted client-side so the °C/°F toggle is instant (no refetch).
+    34→ */
+    35→
+    36→const FORECAST_URL = 'https://api.open-meteo.com/v1/forecast';
+    37→const GEOCODE_URL = 'https://geocoding-api.open-meteo.com/v1/search';
+    38→const AIR_QUALITY_URL = 'https://air-quality-api.open-meteo.com/v1/air-quality';
+    39→const ENSEMBLE_URL = 'https://ensemble-api.open-meteo.com/v1/ensemble';
+    40→const ARCHIVE_URL = 'https://archive-api.open-meteo.com/v1/era5';
+    41→const MARINE_URL = 'https://marine-api.open-meteo.com/v1/marine';
+    42→const FLOOD_URL = 'https://flood-api.open-meteo.com/v1/flood';
+    43→const REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse';
+    44→const NOMINATIM_UA = 'AetherWeather/1.0 (weather app demo)';
+    45→
+    46→/** Weather changes slowly — 10 minutes of shared cache is plenty. */
+    47→const WEATHER_REVALIDATE = 600;
+    48→const GEOCODE_REVALIDATE = 86_400;
+    49→/** Models/ensemble drift on the same cadence as the main forecast. */
+    50→const MODELS_REVALIDATE = 600;
+    51→/** ERA5 archive data is frozen history — safe to share for a month. */
+    52→const HISTORICAL_REVALIDATE = 2_592_000; // 30 days
+    53→const HISTORICAL_TIMEOUT_MS = 15_000;
+    54→/** Marine + flood grids update a few times a day. */
+    55→const NEARSHORE_REVALIDATE = 3_600;
+    56→
+    57→class UpstreamError extends Error {
+    58→  constructor(
+    59→    message: string,
+    60→    readonly status = 502,
+    61→  ) {
+    62→    super(message);
+    63→    this.name = 'UpstreamError';
+    64→  }
+    65→}
+    66→
+    67→const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+    68→
+    69→/** Upstream attempts before giving up (the sandbox egress path needs a few tries for cold hosts). */
+    70→const FETCH_ATTEMPTS = 5;
+    71→
+    72→async function fetchJson<T>(url: string, revalidate: number, init?: RequestInit): Promise<T> {
+    73→  // Transient network hiccups (this host's upstream route occasionally times
+    74→  // out, and first contact with an upstream host can ETIMEDOUT a few times
+    75→  // before the egress path warms up) get up to 5 attempts with escalating
+    76→  // backoff (250ms → 1s → 2.25s → 4s).
+    77→  let lastError: unknown;
+    78→  for (let attempt = 1; attempt <= FETCH_ATTEMPTS; attempt += 1) {
+    79→    try {
+    80→      const res = await fetch(url, { ...init, next: { revalidate } });
+    81→      if (!res.ok) {
+    82→        throw new UpstreamError(
+    83→          `Upstream request failed (${res.status}) for ${new URL(url).hostname}`,
+    84→        );
+    85→      }
+    86→      return (await res.json()) as T;
+    87→    } catch (error) {
+    88→      lastError = error;
+    89→      if (error instanceof UpstreamError) throw error;
+    90→      // A caller-supplied deadline (the historical 15s cap) is final.
+    91→      if (init?.signal?.aborted) throw error;
+    92→      if (attempt < FETCH_ATTEMPTS) await sleep(250 * attempt * attempt);
+    93→    }
+    94→  }
+    95→  throw lastError instanceof Error
+    96→    ? lastError
+    97→    : new UpstreamError('Upstream request failed');
+    98→}
+    99→
+   100→// ---------------------------------------------------------------------------
+   101→// Geocoding
+   102→// ---------------------------------------------------------------------------
+   103→
+   104→interface OmGeocodeResult {
+   105→  id: number;
+   106→  name: string;
+   107→  latitude: number;
+   108→  longitude: number;
+   109→  country?: string;
+   110→  country_code?: string;
+   111→  admin1?: string;
+   112→  timezone?: string;
+   113→  population?: number;
+   114→}
+   115→
+   116→interface OmGeocodeResponse {
+   117→  results?: OmGeocodeResult[];
+   118→}
+   119→
+   120→function toCity(result: OmGeocodeResult): City {
+   121→  return {
+   122→    id: result.id,
+   123→    name: result.name,
+   124→    admin1: result.admin1,
+   125→    country: result.country ?? '',
+   126→    countryCode: result.country_code,
+   127→    latitude: result.latitude,
+   128→    longitude: result.longitude,
+   129→    timezone: result.timezone,
+   130→    source: 'search',
+   131→  };
+   132→}
+   133→
+   134→export async function searchCities(query: string, count = 8): Promise<City[]> {
+   135→  const url = `${GEOCODE_URL}?name=${encodeURIComponent(query)}&count=${count}&language=en&format=json`;
+   136→  const data = await fetchJson<OmGeocodeResponse>(url, GEOCODE_REVALIDATE);
+   137→  return (data.results ?? []).map(toCity);
+   138→}
+   139→
+   140→interface NominatimReverse {
+   141→  name?: string;
+   142→  address?: {
+   143→    city?: string;
+   144→    town?: string;
+   145→    village?: string;
+   146→    municipality?: string;
+   147→    county?: string;
+   148→    state?: string;
+   149→    country?: string;
+   150→    country_code?: string;
+   151→  };
+   152→}
+   153→
+   154→export async function reverseGeocode(lat: number, lon: number): Promise<City> {
+   155→  const url = `${REVERSE_URL}?lat=${lat}&lon=${lon}&format=json&zoom=10&addressdetails=1`;
+   156→  const data = await fetchJson<NominatimReverse>(url, GEOCODE_REVALIDATE, {
+   157→    headers: { 'User-Agent': NOMINATIM_UA, Accept: 'application/json' },
+   158→  });
+   159→  const address = data.address ?? {};
+   160→  const name =
+   161→    data.name || address.city || address.town || address.village || address.municipality || address.county;
+   162→  return {
+   163→    // Negative id keeps located places from colliding with geocoding ids.
+   164→    id: -Math.round((Math.abs(lat * 1000) * 31 + Math.abs(lon * 1000) * 17) % 2_000_000_000),
+   165→    name: name || 'My location',
+   166→    admin1: address.state,
+   167→    country: address.country ?? '',
+   168→    countryCode: address.country_code?.toUpperCase(),
+   169→    latitude: lat,
+   170→    longitude: lon,
+   171→    source: 'location',
+   172→  };
+   173→}
+   174→
+   175→// ---------------------------------------------------------------------------
+   176→// Weather + air quality
+   177→// ---------------------------------------------------------------------------
+   178→
+   179→const CURRENT_FIELDS = [
+   180→  'temperature_2m',
+   181→  'relative_humidity_2m',
+   182→  'apparent_temperature',
+   183→  'is_day',
+   184→  'precipitation',
+   185→  'weather_code',
+   186→  'cloud_cover',
+   187→  'pressure_msl',
+   188→  'wind_speed_10m',
+   189→  'wind_direction_10m',
+   190→  'wind_gusts_10m',
+   191→].join(',');
+   192→
+   193→const HOURLY_FIELDS = [
+   194→  'temperature_2m',
+   195→  'precipitation_probability',
+   196→  'precipitation',
+   197→  'weather_code',
+   198→  'is_day',
+   199→  'visibility',
+   200→  'uv_index',
+   201→  'wind_speed_10m',
+   202→].join(',');
+   203→
+   204→const DAILY_FIELDS = [
+   205→  'weather_code',
+   206→  'temperature_2m_max',
+   207→  'temperature_2m_min',
+   208→  'sunrise',
+   209→  'sunset',
+   210→  'precipitation_probability_max',
+   211→  'uv_index_max',
+   212→  'wind_speed_10m_max',
+   213→].join(',');
+   214→
+   215→/** 15-minute precipitation nowcast fields (dedicated second forecast call). */
+   216→const MINUTELY_FIELDS = 'precipitation,precipitation_probability';
+   217→/** Number of 15-minute steps returned: now → +2 hours. */
+   218→const MINUTELY_POINTS = 8;
+   219→
+   220→/** Pollen fields piggybacked on the air-quality call (Europe only upstream). */
+   221→const POLLEN_FIELDS = [
+   222→  'alder_pollen',
+   223→  'birch_pollen',
+   224→  'grass_pollen',
+   225→  'ragweed_pollen',
+   226→  'olive_pollen',
+   227→  'mugwort_pollen',
+   228→].join(',');
+   229→
+   230→interface OmForecast {
+   231→  utc_offset_seconds: number;
+   232→  timezone: string;
+   233→  timezone_abbreviation: string;
+   234→  current: {
+   235→    time: string;
+   236→    temperature_2m: number;
+   237→    relative_humidity_2m: number;
+   238→    apparent_temperature: number;
+   239→    is_day: number;
+   240→    precipitation: number;
+   241→    weather_code: number;
+   242→    cloud_cover: number;
+   243→    pressure_msl: number;
+   244→    wind_speed_10m: number;
+   245→    wind_direction_10m: number;
+   246→    wind_gusts_10m: number;
+   247→  };
+   248→  hourly: {
+   249→    time: string[];
+   250→    temperature_2m: number[];
+   251→    precipitation_probability: (number | null)[];
+   252→    precipitation: number[];
+   253→    weather_code: number[];
+   254→    is_day: number[];
+   255→    visibility: (number | null)[];
+   256→    uv_index: (number | null)[];
+   257→    wind_speed_10m: number[];
+   258→  };
+   259→  daily: {
+   260→    time: string[];
+   261→    weather_code: number[];
+   262→    temperature_2m_max: number[];
+   263→    temperature_2m_min: number[];
+   264→    sunrise: (string | null)[];
+   265→    sunset: (string | null)[];
+   266→    precipitation_probability_max: (number | null)[];
+   267→    uv_index_max: (number | null)[];
+   268→    wind_speed_10m_max: number[];
+   269→  };
+   270→}
+   271→
+   272→interface OmAirQuality {
+   273→  current?: {
+   274→    time: string;
+   275→    european_aqi: number | null;
+   276→    us_aqi: number | null;
+   277→    pm10: number | null;
+   278→    pm2_5: number | null;
+   279→    carbon_monoxide: number | null;
+   280→    nitrogen_dioxide: number | null;
+   281→    sulphur_dioxide: number | null;
+   282→    ozone: number | null;
+   283→  };
+   284→  /** Present when pollen fields are requested; arrays are all-null outside Europe. */
+   285→  hourly?: {
+   286→    time: string[];
+   287→    alder_pollen?: (number | null)[];
+   288→    birch_pollen?: (number | null)[];
+   289→    grass_pollen?: (number | null)[];
+   290→    ragweed_pollen?: (number | null)[];
+   291→    olive_pollen?: (number | null)[];
+   292→    mugwort_pollen?: (number | null)[];
+   293→  };
+   294→}
+   295→
+   296→interface OmMinutelyForecast {
+   297→  minutely_15?: {
+   298→    time: string[];
+   299→    precipitation?: (number | null)[];
+   300→    precipitation_probability?: (number | null)[];
+   301→  };
+   302→}
+   303→
+   304→const num = (value: number | null | undefined, fallback: number): number =>
+   305→  value == null || !Number.isFinite(value) ? fallback : value;
+   306→
+   307→/** Slice the next 48 hours starting at (or just after) the current time. */
+   308→function sliceCurrentHour(forecast: OmForecast): HourlyPoint[] {
+   309→  const { hourly, current } = forecast;
+   310→  const currentHourPrefix = current.time.slice(0, 13); // "YYYY-MM-DDTHH"
+   311→  let start = hourly.time.findIndex((t) => t.slice(0, 13) === currentHourPrefix);
+   312→  if (start < 0) start = Math.max(0, hourly.time.length - 48);
+   313→
+   314→  const points: HourlyPoint[] = [];
+   315→  for (let i = start; i < hourly.time.length && points.length < 48; i += 1) {
+   316→    points.push({
+   317→      time: hourly.time[i],
+   318→      temperature: num(hourly.temperature_2m[i], 0),
+   319→      precipitationProbability: num(hourly.precipitation_probability[i], 0),
+   320→      precipitation: num(hourly.precipitation[i], 0),
+   321→      weatherCode: num(hourly.weather_code[i], 0),
+   322→      isDay: num(hourly.is_day[i], 1) === 1,
+   323→      visibility: num(hourly.visibility[i], 24_000),
+   324→      uvIndex: num(hourly.uv_index[i], 0),
+   325→      windSpeed: num(hourly.wind_speed_10m[i], 0),
+   326→      condition: conditionOf(num(hourly.weather_code[i], 0)),
+   327→    });
+   328→  }
+   329→  return points;
+   330→}
+   331→
+   332→/**
+   333→ * Slice the 15-minute nowcast from the current time slot → +2 hours.
+   334→ * Returns null when the response is missing/empty (the call is best-effort).
+   335→ */
+   336→function sliceMinutely(data: OmMinutelyForecast | null, nowLocal: string): MinutelyPoint[] | null {
+   337→  const minutely = data?.minutely_15;
+   338→  if (!minutely || minutely.time.length === 0) return null;
+   339→  // Local ISO strings are zero-padded, so lexicographic order === chronological order.
+   340→  let start = minutely.time.findIndex((t) => t >= nowLocal);
+   341→  if (start < 0) return null;
+   342→
+   343→  const points: MinutelyPoint[] = [];
+   344→  for (let i = start; i < minutely.time.length && points.length < MINUTELY_POINTS; i += 1) {
+   345→    points.push({
+   346→      time: minutely.time[i],
+   347→      precip: num(minutely.precipitation?.[i] ?? null, 0),
+   348→      precipProbability: num(minutely.precipitation_probability?.[i] ?? null, 0),
+   349→    });
+   350→  }
+   351→  return points.length > 0 ? points : null;
+   352→}
+   353→
+   354→const POLLEN_KEYS = [
+   355→  'alder_pollen',
+   356→  'birch_pollen',
+   357→  'grass_pollen',
+   358→  'ragweed_pollen',
+   359→  'olive_pollen',
+   360→  'mugwort_pollen',
+   361→] as const;
+   362→
+   363→/**
+   364→ * Summarize hourly pollen into a single next-24h snapshot (max per type).
+   365→ * `available` is true only when the upstream actually reports pollen here
+   366→ * (Europe); elsewhere every array is all-null and the flag stays false.
+   367→ */
+   368→function extractPollen(air: OmAirQuality | null): Pollen | null {
+   369→  const hourly = air?.hourly;
+   370→  if (!hourly || hourly.time.length === 0) return null;
+   371→
+   372→  const anchor = air.current?.time ?? hourly.time[0];
+   373→  let start = hourly.time.findIndex((t) => t >= anchor);
+   374→  if (start < 0) start = 0;
+   375→  const end = Math.min(start + 24, hourly.time.length);
+   376→
+   377→  const maxOf = (key: (typeof POLLEN_KEYS)[number]): number | null => {
+   378→    let max: number | null = null;
+   379→    const values = hourly?.[key];
+   380→    if (!values) return null;
+   381→    for (let i = start; i < end; i += 1) {
+   382→      const value = values[i];
+   383→      if (value != null && Number.isFinite(value) && (max == null || value > max)) {
+   384→        max = value;
+   385→      }
+   386→    }
+   387→    return max;
+   388→  };
+   389→
+   390→  const [alder, birch, grass, ragweed, olive, mugwort] = POLLEN_KEYS.map(maxOf);
+   391→  return {
+   392→    available: [alder, birch, grass, ragweed, olive, mugwort].some((v) => v !== null),
+   393→    time: hourly.time[start],
+   394→    alder,
+   395→    birch,
+   396→    grass,
+   397→    ragweed,
+   398→    olive,
+   399→    mugwort,
+   400→  };
+   401→}
+   402→
+   403→export async function fetchWeatherBundle(lat: number, lon: number): Promise<WeatherBundle> {
+   404→  const forecastUrl =
+   405→    `${FORECAST_URL}?latitude=${lat}&longitude=${lon}` +
+   406→    `&current=${CURRENT_FIELDS}&hourly=${HOURLY_FIELDS}&daily=${DAILY_FIELDS}` +
+   407→    `&timezone=auto&forecast_days=16&past_hours=1&forecast_hours=54`;
+   408→
+   409→  // Pollen piggybacks on the air-quality call (same upstream, one request).
+   410→  const airUrl =
+   411→    `${AIR_QUALITY_URL}?latitude=${lat}&longitude=${lon}` +
+   412→    `&current=european_aqi,us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone` +
+   413→    `&hourly=${POLLEN_FIELDS}&forecast_days=3&timezone=auto`;
+   414→
+   415→  // Dedicated nowcast call. forecast_days=2 (not 1) so the 2-hour window is
+   416→  // fully covered even shortly before local midnight.
+   417→  const minutelyUrl =
+   418→    `${FORECAST_URL}?latitude=${lat}&longitude=${lon}` +
+   419→    `&minutely_15=${MINUTELY_FIELDS}&forecast_days=2&timezone=auto`;
+   420→
+   421→  // Air quality, pollen and the nowcast are nice-to-haves: a failure of any
+   422→  // of them must not break the core forecast.
+   423→  const [forecast, air, minutelyForecast] = await Promise.all([
+   424→    fetchJson<OmForecast>(forecastUrl, WEATHER_REVALIDATE),
+   425→    fetchJson<OmAirQuality>(airUrl, WEATHER_REVALIDATE).catch(() => null),
+   426→    fetchJson<OmMinutelyForecast>(minutelyUrl, WEATHER_REVALIDATE).catch(() => null),
+   427→  ]);
+   428→
+   429→  const current = forecast.current;
+   430→  const daily: DailyPoint[] = forecast.daily.time.slice(0, 16).map((date, i) => ({
+   431→    date,
+   432→    weatherCode: num(forecast.daily.weather_code[i], 0),
+   433→    tempMax: num(forecast.daily.temperature_2m_max[i], 0),
+   434→    tempMin: num(forecast.daily.temperature_2m_min[i], 0),
+   435→    sunrise: forecast.daily.sunrise[i] ?? `${date}T06:00`,
+   436→    sunset: forecast.daily.sunset[i] ?? `${date}T18:00`,
+   437→    precipitationProbabilityMax: num(forecast.daily.precipitation_probability_max[i], 0),
+   438→    uvIndexMax: num(forecast.daily.uv_index_max[i], 0),
+   439→    windSpeedMax: num(forecast.daily.wind_speed_10m_max[i], 0),
+   440→    condition: conditionOf(num(forecast.daily.weather_code[i], 0)),
+   441→  }));
+   442→
+   443→  const airQuality: AirQuality | null = air?.current
+   444→    ? {
+   445→        europeanAqi: air.current.european_aqi ?? null,
+   446→        usAqi: air.current.us_aqi ?? null,
+   447→        pm2_5: air.current.pm2_5 ?? null,
+   448→        pm10: air.current.pm10 ?? null,
+   449→        ozone: air.current.ozone ?? null,
+   450→        no2: air.current.nitrogen_dioxide ?? null,
+   451→        so2: air.current.sulphur_dioxide ?? null,
+   452→        co: air.current.carbon_monoxide ?? null,
+   453→        time: air.current.time,
+   454→      }
+   455→    : null;
+   456→
+   457→  return {
+   458→    current: {
+   459→      time: current.time,
+   460→      temperature: num(current.temperature_2m, 0),
+   461→      apparentTemperature: num(current.apparent_temperature, 0),
+   462→      humidity: num(current.relative_humidity_2m, 0),
+   463→      isDay: num(current.is_day, 1) === 1,
+   464→      precipitation: num(current.precipitation, 0),
+   465→      weatherCode: num(current.weather_code, 0),
+   466→      cloudCover: num(current.cloud_cover, 0),
+   467→      pressure: num(current.pressure_msl, 1013),
+   468→      windSpeed: num(current.wind_speed_10m, 0),
+   469→      windGust: num(current.wind_gusts_10m, 0),
+   470→      windDirection: num(current.wind_direction_10m, 0),
+   471→      condition: conditionOf(num(current.weather_code, 0)),
+   472→    },
+   473→    hourly: sliceCurrentHour(forecast),
+   474→    daily,
+   475→    airQuality,
+   476→    minutely: sliceMinutely(minutelyForecast, current.time),
+   477→    pollen: extractPollen(air),
+   478→    utcOffsetSeconds: forecast.utc_offset_seconds ?? 0,
+   479→    timezone: forecast.timezone ?? 'UTC',
+   480→    timezoneAbbreviation: forecast.timezone_abbreviation ?? '',
+   481→    fetchedAt: new Date().toISOString(),
+   482→  };
+   483→}
+   484→
+   485→// ---------------------------------------------------------------------------
+   486→// Multi-model comparison / ensemble spread
+   487→// ---------------------------------------------------------------------------
+   488→
+   489→/** Upstream model ids (one call → suffixed hourly keys, e.g. temperature_2m_ecmwf_ifs025). */
+   490→const MODEL_SOURCES = [
+   491→  {
+   492→    id: 'ecmwf',
+   493→    label: 'ECMWF',
+   494→    tempKey: 'temperature_2m_ecmwf_ifs025',
+   495→    precipKey: 'precipitation_ecmwf_ifs025',
+   496→  },
+   497→  {
+   498→    id: 'gfs',
+   499→    label: 'GFS (NOAA)',
+   500→    tempKey: 'temperature_2m_gfs_seamless',
+   501→    precipKey: 'precipitation_gfs_seamless',
+   502→  },
+   503→  {
+   504→    id: 'icon',
+   505→    label: 'ICON (DWD)',
+   506→    tempKey: 'temperature_2m_icon_seamless',
+   507→    precipKey: 'precipitation_icon_seamless',
+   508→  },
+   509→] as const;
+   510→
+   511→const MODELS_PARAM = 'ecmwf_ifs025,gfs_seamless,icon_seamless';
+   512→
+   513→interface OmModelsHourly {
+   514→  time: string[];
+   515→  temperature_2m_ecmwf_ifs025?: (number | null)[];
+   516→  precipitation_ecmwf_ifs025?: (number | null)[];
+   517→  temperature_2m_gfs_seamless?: (number | null)[];
+   518→  precipitation_gfs_seamless?: (number | null)[];
+   519→  temperature_2m_icon_seamless?: (number | null)[];
+   520→  precipitation_icon_seamless?: (number | null)[];
+   521→}
+   522→
+   523→/** Side-by-side ECMWF / GFS / ICON 7-day hourly comparison. */
+   524→export async function fetchModelComparison(lat: number, lon: number): Promise<ModelsResponse> {
+   525→  const url =
+   526→    `${FORECAST_URL}?latitude=${lat}&longitude=${lon}` +
+   527→    `&models=${MODELS_PARAM}&hourly=temperature_2m,precipitation&forecast_days=7&timezone=auto`;
+   528→  const data = await fetchJson<{ hourly?: OmModelsHourly }>(url, MODELS_REVALIDATE);
+   529→  const hourly = data.hourly;
+   530→
+   531→  const models = MODEL_SOURCES.map(({ id, label, tempKey, precipKey }) => ({
+   532→    id,
+   533→    label,
+   534→    hourly: (hourly?.time ?? []).map<ModelHourlyPoint>((time, i) => ({
+   535→      time,
+   536→      temp: num(hourly?.[tempKey]?.[i] ?? null, 0),
+   537→      precip: num(hourly?.[precipKey]?.[i] ?? null, 0),
+   538→    })),
+   539→  }));
+   540→  return { models };
+   541→}
+   542→
+   543→/** ICON ensemble: base series + member01…member39. */
+   544→const ENSEMBLE_MEMBERS = 40;
+   545→
+   546→interface OmEnsembleHourly {
+   547→  time: string[];
+   548→  [variable: string]: unknown;
+   549→}
+   550→
+   551→function numSeries(hourly: OmEnsembleHourly, key: string): Array<number | null> {
+   552→  const raw = hourly[key];
+   553→  if (!Array.isArray(raw)) return [];
+   554→  const values: Array<number | null> = [];
+   555→  for (const item of raw) {
+   556→    if (item === null || typeof item === 'number') values.push(item);
+   557→  }
+   558→  return values;
+   559→}
+   560→
+   561→/**
+   562→ * ICON ensemble mean ± spread for the next 7 days. The upstream `*_spread`
+   563→ * arrays currently come back all-null, so the spread is computed here as the
+   564→ * population σ across the 40 returned member series (upstream value wins if
+   565→ * it ever starts reporting).
+   566→ */
+   567→export async function fetchEnsemble(lat: number, lon: number): Promise<EnsembleResponse> {
+   568→  const url =
+   569→    `${ENSEMBLE_URL}?latitude=${lat}&longitude=${lon}` +
+   570→    `&models=icon_seamless&hourly=temperature_2m,temperature_2m_spread,precipitation` +
+   571→    `&forecast_days=7&timezone=auto`;
+   572→  const data = await fetchJson<{ hourly?: OmEnsembleHourly }>(url, MODELS_REVALIDATE);
+   573→  const hourly = data.hourly;
+   574→  if (!hourly) return { hourly: [] };
+   575→
+   576→  const temps = numSeries(hourly, 'temperature_2m');
+   577→  const precip = numSeries(hourly, 'precipitation');
+   578→  const upstreamSpread = numSeries(hourly, 'temperature_2m_spread');
+   579→  const memberTemps = [
+   580→    temps,
+   581→    ...Array.from({ length: ENSEMBLE_MEMBERS - 1 }, (_, m) =>
+   582→      numSeries(hourly, `temperature_2m_member${String(m + 1).padStart(2, '0')}`),
+   583→    ),
+   584→  ].filter((series) => series.length > 0);
+   585→
+   586→  // Trim trailing hours the ensemble horizon doesn't cover (ICON ~142 of 168).
+   587→  let last = hourly.time.length - 1;
+   588→  while (last >= 0 && temps[last] == null && precip[last] == null) last -= 1;
+   589→
+   590→  const points: EnsembleHourly[] = [];
+   591→  for (let i = 0; i <= last; i += 1) {
+   592→    let tempSpread = upstreamSpread[i] ?? null;
+   593→    if (tempSpread == null && memberTemps.length > 1) {
+   594→      const values: number[] = [];
+   595→      for (const series of memberTemps) {
+   596→        const value = series[i];
+   597→        if (value != null) values.push(value);
+   598→      }
+   599→      if (values.length > 1) {
+   600→        const mean = values.reduce((a, v) => a + v, 0) / values.length;
+   601→        const variance = values.reduce((a, v) => a + (v - mean) ** 2, 0) / values.length;
+   602→        tempSpread = Math.round(Math.sqrt(variance) * 100) / 100;
+   603→      }
+   604→    }
+   605→    points.push({
+   606→      time: hourly.time[i],
+   607→      temp: num(temps[i], 0),
+   608→      tempSpread,
+   609→      precip: num(precip[i], 0),
+   610→    });
+   611→  }
+   612→  return { hourly: points };
+   613→}
+   614→
+   615→// ---------------------------------------------------------------------------
+   616→// Historical climate normals / marine / flood
+   617→// ---------------------------------------------------------------------------
+   618→
+   619→const HISTORICAL_START_YEAR = 1995;
+   620→
+   621→interface OmArchiveDaily {
+   622→  time: string[];
+   623→  temperature_2m_max?: (number | null)[];
+   624→  temperature_2m_min?: (number | null)[];
+   625→}
+   626→
+   627→/**
+   628→ * 1995 → last complete year ERA5 history for one calendar date, plus the
+   629→ * 30-year normal. One upstream call per rounded coordinate (the archive
+   630→ * payload is shared across every month/day of that spot via the fetch cache).
+   631→ * Feb 29 keeps its year slot with nulls in non-leap years so the year axis
+   632→ * stays continuous.
+   633→ */
+   634→export async function fetchHistorical(
+   635→  lat: number,
+   636→  lon: number,
+   637→  month: number,
+   638→  day: number,
+   639→): Promise<HistoricalResponse> {
+   640→  // Round to 1 decimal so nearby queries share a single cached request.
+   641→  const rlat = Math.round(lat * 10) / 10;
+   642→  const rlon = Math.round(lon * 10) / 10;
+   643→  const endYear = new Date().getUTCFullYear() - 1;
+   644→  const url =
+   645→    `${ARCHIVE_URL}?latitude=${rlat}&longitude=${rlon}` +
+   646→    `&start_date=${HISTORICAL_START_YEAR}-01-01&end_date=${endYear}-12-31` +
+   647→    `&daily=temperature_2m_max,temperature_2m_min&timezone=auto`;
+   648→
+   649→  // Hard 15s cap: a slow archive fetch surfaces as an error at the route
+   650→  // level (which degrades to a 200 { error } response). The aborted signal
+   651→  // also short-circuits fetchJson's retries, keeping the total ≈ 15s.
+   652→  const data = await fetchJson<{ daily?: OmArchiveDaily }>(url, HISTORICAL_REVALIDATE, {
+   653→    signal: AbortSignal.timeout(HISTORICAL_TIMEOUT_MS),
+   654→  });
+   655→
+   656→  const times = data.daily?.time ?? [];
+   657→  const tmaxSeries = data.daily?.temperature_2m_max ?? [];
+   658→  const tminSeries = data.daily?.temperature_2m_min ?? [];
+   659→
+   660→  const suffix = `-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+   661→  const byYear = new Map<number, { tmax: number | null; tmin: number | null }>();
+   662→  for (let i = 0; i < times.length; i += 1) {
+   663→    const date = times[i];
+   664→    if (!date.endsWith(suffix)) continue;
+   665→    byYear.set(Number(date.slice(0, 4)), {
+   666→      tmax: tmaxSeries[i] ?? null,
+   667→      tmin: tminSeries[i] ?? null,
+   668→    });
+   669→  }
+   670→
+   671→  const firstYear = times.length > 0 ? Number(times[0].slice(0, 4)) : HISTORICAL_START_YEAR;
+   672→  const lastYear = times.length > 0 ? Number(times[times.length - 1].slice(0, 4)) : endYear;
+   673→
+   674→  const years: HistoricalYear[] = [];
+   675→  for (let year = firstYear; year <= lastYear; year += 1) {
+   676→    const hit = byYear.get(year);
+   677→    years.push({ year, tmax: hit?.tmax ?? null, tmin: hit?.tmin ?? null });
+   678→  }
+   679→
+   680→  const mean = (values: number[]): number | null =>
+   681→    values.length === 0
+   682→      ? null
+   683→      : Math.round((values.reduce((a, v) => a + v, 0) / values.length) * 10) / 10;
+   684→
+   685→  return {
+   686→    month,
+   687→    day,
+   688→    years,
+   689→    normal: {
+   690→      tmax: mean(years.map((y) => y.tmax).filter((v): v is number => v != null)),
+   691→      tmin: mean(years.map((y) => y.tmin).filter((v): v is number => v != null)),
+   692→    },
+   693→  };
+   694→}
+   695→
+   696→interface OmMarineDaily {
+   697→  time: string[];
+   698→  wave_height_max?: (number | null)[];
+   699→  wave_direction_dominant?: (number | null)[];
+   700→  wave_period_max?: (number | null)[];
+   701→}
+   702→
+   703→/**
+   704→ * 7-day wave forecast. Inland coordinates answer 200 with all-null wave
+   705→ * values — both that case and upstream failures surface as available:false.
+   706→ */
+   707→export async function fetchMarine(lat: number, lon: number): Promise<MarineResponse> {
+   708→  const url =
+   709→    `${MARINE_URL}?latitude=${lat}&longitude=${lon}` +
+   710→    `&daily=wave_height_max,wave_direction_dominant,wave_period_max&forecast_days=7&timezone=auto`;
+   711→  const data = await fetchJson<{ daily?: OmMarineDaily }>(url, NEARSHORE_REVALIDATE);
+   712→
+   713→  const daily: MarineDay[] = (data.daily?.time ?? []).map((date, i) => ({
+   714→    date,
+   715→    waveHeightMax: data.daily?.wave_height_max?.[i] ?? null,
+   716→    waveDirectionDominant: data.daily?.wave_direction_dominant?.[i] ?? null,
+   717→    wavePeriodMax: data.daily?.wave_period_max?.[i] ?? null,
+   718→  }));
+   719→  const available = daily.some((d) => d.waveHeightMax != null);
+   720→  return available ? { available: true, daily } : { available: false, daily: [] };
+   721→}
+   722→
+   723→interface OmFloodDaily {
+   724→  time: string[];
+   725→  river_discharge?: (number | null)[];
+   726→}
+   727→
+   728→/**
+   729→ * 7-day river discharge of the nearest grid cell (GloFAS). The v1 endpoint is
+   730→ * the one that works — v2 404s. Fewer days than requested may come back.
+   731→ */
+   732→export async function fetchFlood(lat: number, lon: number): Promise<FloodResponse> {
+   733→  const url =
+   734→    `${FLOOD_URL}?latitude=${lat}&longitude=${lon}&daily=river_discharge&forecast_days=7`;
+   735→  const data = await fetchJson<{ daily?: OmFloodDaily }>(url, NEARSHORE_REVALIDATE);
+   736→
+   737→  const daily: FloodDay[] = (data.daily?.time ?? []).map((date, i) => ({
+   738→    date,
+   739→    discharge: data.daily?.river_discharge?.[i] ?? null,
+   740→  }));
+   741→  const available = daily.some((d) => d.discharge != null);
+   742→  return available ? { available: true, daily } : { available: false, daily: [] };
+   743→}
+   744→

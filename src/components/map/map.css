@@ -1,0 +1,173 @@
+/* ================================================================== */
+/* Map module — chrome styles: glass popups, pins, canvases,           */
+/* maplibre control theming. Loaded only with the map overlay.         */
+/* ================================================================== */
+
+/* --- Canvas overlays (wind particles / heat) above the map canvas --- */
+
+/* maplibre's own `.maplibregl-map { position: relative }` (loaded after
+   globals.css) would beat Tailwind's `absolute` on the viewport div —
+   out-specify it here. */
+.aether-map .maplibregl-map {
+  position: absolute;
+  inset: 0;
+}
+
+.aether-map-canvas {
+  position: absolute;
+  inset: 0;
+  /* canvas is a replaced element — inset alone won't stretch it. */
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  pointer-events: none;
+  transition: opacity 220ms ease;
+}
+
+.aether-map-canvas[data-stale='true'] {
+  opacity: 0.35;
+}
+
+/* --- Glass popups (maplibre Popup with className aether-popup) ------ */
+
+.aether-popup {
+  z-index: 30;
+}
+
+.aether-popup .maplibregl-popup-content {
+  padding: 0;
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.05), rgb(255 255 255 / 0)),
+    rgb(13 30 32 / 0.82);
+  -webkit-backdrop-filter: blur(22px) saturate(1.65);
+  backdrop-filter: blur(22px) saturate(1.65);
+  border: 1px solid rgb(255 255 255 / 0.14);
+  border-radius: 16px;
+  box-shadow:
+    0 18px 48px -12px rgb(3 12 13 / 0.6),
+    0 2px 10px rgb(3 12 13 / 0.35),
+    inset 0 1px 0 rgb(255 255 255 / 0.1);
+  overflow: hidden;
+  color: inherit;
+}
+
+[data-surface='light'] .aether-popup .maplibregl-popup-content {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.5), rgb(255 255 255 / 0)),
+    rgb(244 250 247 / 0.9);
+  border-color: rgb(14 42 46 / 0.12);
+}
+
+.aether-popup .maplibregl-popup-tip {
+  display: none;
+}
+
+/* --- City / point pins ---------------------------------------------- */
+
+.aether-pin {
+  width: 13px;
+  height: 13px;
+  border-radius: 9999px;
+  background: rgb(240 253 250 / 0.95);
+  border: 2px solid #22bca0;
+  box-shadow:
+    0 1px 6px rgb(3 12 13 / 0.5),
+    0 0 0 2px rgb(34 188 160 / 0.22);
+  cursor: pointer;
+}
+
+.aether-pin--active {
+  width: 17px;
+  height: 17px;
+  border-color: #74dcc2;
+  position: relative;
+}
+
+.aether-pin--active::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 9999px;
+  border: 2px solid rgb(116 220 194 / 0.75);
+  animation: aether-pin-pulse 2.4s ease-out infinite;
+}
+
+@keyframes aether-pin-pulse {
+  0% {
+    transform: scale(0.55);
+    opacity: 0.9;
+  }
+  70%,
+  100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+
+.aether-pin--point {
+  width: 15px;
+  height: 15px;
+  background: rgb(240 253 250 / 0.9);
+  border: 2px solid #45d1b3;
+  cursor: default;
+}
+
+.aether-pin--point::after {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border-radius: 9999px;
+  background: #0f4a41;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aether-pin--active::after {
+    animation: none;
+    opacity: 0.35;
+  }
+}
+
+/* --- Maplibre controls (attribution + nav) as glass chips ----------- */
+
+.aether-map .maplibregl-ctrl-attrib {
+  background: rgb(10 22 24 / 0.66);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  border-radius: 10px 0 0 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: rgb(180 212 205 / 0.9);
+  padding: 1px 6px;
+}
+
+.aether-map .maplibregl-ctrl-attrib a {
+  color: rgb(140 220 200 / 0.95);
+}
+
+.aether-map .maplibregl-ctrl-attrib-button {
+  filter: invert(1) hue-rotate(180deg);
+  opacity: 0.7;
+}
+
+.aether-map .maplibregl-ctrl-group {
+  background: rgb(13 30 32 / 0.72);
+  -webkit-backdrop-filter: blur(14px) saturate(1.5);
+  backdrop-filter: blur(14px) saturate(1.5);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 6px 20px -6px rgb(3 12 13 / 0.55);
+}
+
+.aether-map .maplibregl-ctrl-group button + button {
+  border-top: 1px solid rgb(255 255 255 / 0.1);
+}
+
+.aether-map .maplibregl-ctrl-group button .maplibregl-ctrl-icon {
+  filter: invert(1);
+  opacity: 0.85;
+}
+
+.aether-map .maplibregl-ctrl-group button:hover {
+  background: rgb(34 188 160 / 0.16);
+}

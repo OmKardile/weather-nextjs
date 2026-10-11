@@ -13,6 +13,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Additional languages / localization
 - Pluggable AI providers (bring your own key / endpoint)
 
+## [2.0.1] — 2026-10-11
+
+### Added
+- Developer credit — the site footer now signs off with "Designed & developed
+  by Omkar Kardile" (name links to [omkardile.is-a.dev](https://omkardile.is-a.dev/),
+  new tab, hover underline + keyboard focus ring), styled with the existing
+  glass footer tokens at WCAG-AA muted ink.
+- `metadata.authors` in the app layout now identifies the developer (name +
+  URL); `package.json` gains a matching `author` field. README closes with a
+  footer credit.
+
+### Changed
+- Version bumped to 2.0.1 (settings sheet + package manifest).
+
 ## [2.0.0] — 2026-10-11
 
 The "Liquid Glass + AI" release. Aether grows a macOS Tahoe-inspired design system,
@@ -196,6 +210,7 @@ reused from the original except the product idea.
 - Removed the hardcoded OpenWeatherMap API key from the client bundle entirely
   (replaced by keyless Open-Meteo via server routes).
 
-[Unreleased]: https://github.com/aether/aether-weather/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/aether/aether-weather/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/aether/aether-weather/releases/tag/v2.0.1
 [2.0.0]: https://github.com/aether/aether-weather/releases/tag/v2.0.0
 [1.0.0]: https://github.com/aether/aether-weather/releases/tag/v1.0.0
