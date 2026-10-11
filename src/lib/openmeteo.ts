@@ -44,9 +44,10 @@ class UpstreamError extends Error {
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function fetchJson<T>(url: string, revalidate: number, init?: RequestInit): Promise<T> {
-  // Transient network hiccups get one quick retry.
+  // Transient network hiccups (this host's upstream route occasionally times
+  // out once) get up to 3 attempts with escalating backoff.
   let lastError: unknown;
-  for (let attempt = 0; attempt < 2; attempt += 1) {
+  for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       const res = await fetch(url, { ...init, next: { revalidate } });
       if (!res.ok) {
@@ -58,7 +59,7 @@ async function fetchJson<T>(url: string, revalidate: number, init?: RequestInit)
     } catch (error) {
       lastError = error;
       if (error instanceof UpstreamError) throw error;
-      if (attempt === 0) await sleep(200);
+      if (attempt < 2) await sleep(250 * (attempt + 1) * (attempt + 1));
     }
   }
   throw lastError instanceof Error
@@ -167,6 +168,7 @@ const HOURLY_FIELDS = [
   'is_day',
   'visibility',
   'uv_index',
+  'wind_speed_10m',
 ].join(',');
 
 const DAILY_FIELDS = [
@@ -207,6 +209,7 @@ interface OmForecast {
     is_day: number[];
     visibility: (number | null)[];
     uv_index: (number | null)[];
+    wind_speed_10m: number[];
   };
   daily: {
     time: string[];
@@ -238,15 +241,15 @@ interface OmAirQuality {
 const num = (value: number | null | undefined, fallback: number): number =>
   value == null || !Number.isFinite(value) ? fallback : value;
 
-/** Slice the next 24 hours starting at (or just after) the current time. */
+/** Slice the next 48 hours starting at (or just after) the current time. */
 function sliceCurrentHour(forecast: OmForecast): HourlyPoint[] {
   const { hourly, current } = forecast;
   const currentHourPrefix = current.time.slice(0, 13); // "YYYY-MM-DDTHH"
   let start = hourly.time.findIndex((t) => t.slice(0, 13) === currentHourPrefix);
-  if (start < 0) start = Math.max(0, hourly.time.length - 24);
+  if (start < 0) start = Math.max(0, hourly.time.length - 48);
 
   const points: HourlyPoint[] = [];
-  for (let i = start; i < hourly.time.length && points.length < 24; i += 1) {
+  for (let i = start; i < hourly.time.length && points.length < 48; i += 1) {
     points.push({
       time: hourly.time[i],
       temperature: num(hourly.temperature_2m[i], 0),
@@ -256,6 +259,7 @@ function sliceCurrentHour(forecast: OmForecast): HourlyPoint[] {
       isDay: num(hourly.is_day[i], 1) === 1,
       visibility: num(hourly.visibility[i], 24_000),
       uvIndex: num(hourly.uv_index[i], 0),
+      windSpeed: num(hourly.wind_speed_10m[i], 0),
       condition: conditionOf(num(hourly.weather_code[i], 0)),
     });
   }
@@ -266,7 +270,7 @@ export async function fetchWeatherBundle(lat: number, lon: number): Promise<Weat
   const forecastUrl =
     `${FORECAST_URL}?latitude=${lat}&longitude=${lon}` +
     `&current=${CURRENT_FIELDS}&hourly=${HOURLY_FIELDS}&daily=${DAILY_FIELDS}` +
-    `&timezone=auto&forecast_days=8&past_hours=1&forecast_hours=30`;
+    `&timezone=auto&forecast_days=8&past_hours=1&forecast_hours=54`;
 
   const airUrl =
     `${AIR_QUALITY_URL}?latitude=${lat}&longitude=${lon}` +

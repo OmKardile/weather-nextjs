@@ -63,6 +63,8 @@ export interface HourlyPoint {
   /** meters */
   visibility: number;
   uvIndex: number;
+  /** km/h */
+  windSpeed: number;
   condition: Condition;
 }
 

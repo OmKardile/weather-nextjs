@@ -64,6 +64,7 @@
   /* Radii — soft, premium */
   --radius-card: 1.25rem;
   --radius-hero: 1.75rem;
+  --radius-pill: 999px;
 
   /* Shadows — layered glass */
   --shadow-glass: 0 1px 2px rgb(10 27 30 / 0.08), 0 12px 32px -12px rgb(10 27 30 / 0.25);
@@ -73,6 +74,9 @@
   /* Motion */
   --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring-soft: cubic-bezier(0.33, 1, 0.68, 1);
+  --ease-spring-snappy: cubic-bezier(0.3, 1.2, 0.3, 1);
+  --ease-spring-bouncy: cubic-bezier(0.5, 1.6, 0.4, 1);
   --animate-fade-up: fade-up 500ms cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-fade-in: fade-in 400ms cubic-bezier(0.22, 1, 0.36, 1) both;
   --animate-scale-in: scale-in 350ms cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -167,7 +171,55 @@
   --surface-ring: #0e7c6b;
   --shadow-glass: 0 1px 2px rgb(66 92 88 / 0.1), 0 10px 28px -10px rgb(66 92 88 / 0.22);
   --shadow-glass-lg: 0 2px 4px rgb(66 92 88 / 0.12), 0 20px 56px -14px rgb(66 92 88 / 0.3);
+
+  /* Make shadcn primitives (dialog, command, dropdown, toast…) scene-aware:
+     ink text on bright frosted surfaces instead of dark-theme mist text. */
+  --background: #dfece7;
+  --foreground: #0e2a2e;
+  --card: rgb(255 255 255 / 0.8);
+  --card-foreground: #0e2a2e;
+  --popover: rgb(255 255 255 / 0.88);
+  --popover-foreground: #0e2a2e;
+  --secondary: rgb(255 255 255 / 0.55);
+  --secondary-foreground: #0e2a2e;
+  --muted: rgb(255 255 255 / 0.5);
+  --muted-foreground: rgb(14 42 46 / 0.64);
+  --accent: rgb(21 144 124 / 0.12);
+  --accent-foreground: #0e2a2e;
+  --border: rgb(14 42 46 / 0.14);
+  --input: rgb(14 42 46 / 0.16);
+  --sidebar: rgb(255 255 255 / 0.6);
+  --sidebar-foreground: #0e2a2e;
+  --sidebar-accent: rgb(21 144 124 / 0.12);
+  --sidebar-accent-foreground: #0e2a2e;
+  --sidebar-border: rgb(14 42 46 / 0.14);
 }
+
+/* ------------------------------------------------------------------ */
+/* Scene tint — weather-reactive glass hue (AetherApp sets data-tint   */
+/* alongside data-surface; mid-tone values read on both dark + light)  */
+/* ------------------------------------------------------------------ */
+
+:root {
+  --glass-tint: 105 205 178; /* clear-teal default until data-tint lands */
+
+  /* Liquid-glass noise (fractal grain kills gradient banding).
+     --glass-noise-src: full strength, alpha applied by the consumer
+     (glass-2 pseudo layers use CSS opacity + overlay blend).
+     --glass-noise-faint: alpha baked in (5%) for legacy alias
+     backgrounds, where per-layer opacity isn't possible. */
+  --glass-noise-src: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='168' height='168'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='168' height='168' filter='url(%23n)'/%3E%3C/svg%3E");
+  --glass-noise-faint: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='168' height='168'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='168' height='168' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+[data-tint="clear"] { --glass-tint: 105 205 178; }
+[data-tint="partly-cloudy"] { --glass-tint: 126 199 186; }
+[data-tint="cloudy"] { --glass-tint: 158 176 168; }
+[data-tint="fog"] { --glass-tint: 176 190 184; }
+[data-tint="drizzle"] { --glass-tint: 118 156 150; }
+[data-tint="rain"] { --glass-tint: 96 134 132; }
+[data-tint="snow"] { --glass-tint: 198 222 226; }
+[data-tint="thunder"] { --glass-tint: 128 112 168; }
 
 /* ------------------------------------------------------------------ */
 /* Base                                                                */
@@ -194,131 +246,185 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Glass surface utilities                                             */
+/* Liquid Glass v2 — surface system (legacy alias API)                 */
+/*                                                                     */
+/* These aliases keep the v1 class API alive for the ~15 existing      */
+/* components while adopting the v2 recipes: scene-tinted fill,        */
+/* top-edge specular, banding-killing noise, layered shadows. They     */
+/* live in @layer components so authored Tailwind utilities on the     */
+/* same elements (border-x-0, focus-within:border-*, bg-*, shadow-*)   */
+/* win exactly as those components intended.                           */
+/*                                                                     */
+/* The canonical v2 primitive is <Glass> → .glass-2-base/raised/       */
+/* overlay in src/components/glass/glass.css (gradient edge, pointer   */
+/* specular, refraction). Aliases stay deliberately cheaper: single    */
+/* fill, real border, noise baked in at low alpha, no pseudo layers.   */
 /* ------------------------------------------------------------------ */
 
-.glass {
-  background: var(--surface);
-  border: 1px solid var(--surface-border);
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
-  backdrop-filter: blur(18px) saturate(150%);
-  box-shadow: var(--shadow-glass);
-}
+@layer components {
+  .glass,
+  .glass-strong,
+  .glass-subtle {
+    --glass-hi: rgb(255 255 255 / 0.22); /* top-edge specular */
+    --glass-lo: transparent;             /* bottom-edge shade (light surfaces) */
+  }
 
-.glass-strong {
-  background: var(--surface-strong);
-  border: 1px solid var(--surface-border);
-  -webkit-backdrop-filter: blur(24px) saturate(160%);
-  backdrop-filter: blur(24px) saturate(160%);
-  box-shadow: var(--shadow-glass-lg);
-}
+  /* Base-level recipe — workhorse cards (10+ per screen: blur stays
+     modest, noise baked at 5% alpha, real border so border-color and
+     border-side utilities keep working). */
+  .glass {
+    background-color: color-mix(in srgb, var(--surface) 100%, rgb(var(--glass-tint) / 1) 6%);
+    background-image:
+      linear-gradient(180deg, var(--glass-hi), transparent 1px),
+      linear-gradient(0deg, var(--glass-lo), transparent 1px),
+      var(--glass-noise-faint);
+    background-size: 100% 100%, 100% 100%, 168px 168px;
+    border: 1px solid var(--surface-border);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    backdrop-filter: blur(16px) saturate(150%);
+    box-shadow: var(--shadow-glass);
+  }
 
-.glass-subtle {
-  background: var(--surface-subtle);
-  border: 1px solid var(--surface-border);
-  -webkit-backdrop-filter: blur(12px) saturate(140%);
-  backdrop-filter: blur(12px) saturate(140%);
-}
+  /* Raised-level recipe — stronger tinted fill, inner hairline ring
+     for the "double border" feel. */
+  .glass-strong {
+    --glass-hi: rgb(255 255 255 / 0.32);
+    background-color: color-mix(in srgb, var(--surface-strong) 100%, rgb(var(--glass-tint) / 1) 10%);
+    background-image:
+      linear-gradient(180deg, var(--glass-hi), transparent 1px),
+      linear-gradient(0deg, var(--glass-lo), transparent 1px),
+      var(--glass-noise-faint);
+    background-size: 100% 100%, 100% 100%, 168px 168px;
+    border: 1px solid var(--surface-border);
+    -webkit-backdrop-filter: blur(24px) saturate(165%);
+    backdrop-filter: blur(24px) saturate(165%);
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.07),
+      var(--shadow-glass-lg);
+  }
 
-.glass-hover {
-  transition:
-    background 250ms var(--ease-soft),
-    border-color 250ms var(--ease-soft),
-    transform 250ms var(--ease-out-expo),
-    box-shadow 250ms var(--ease-soft);
-}
+  /* Base at reduced strength (~65% fill, blur 12) — hourly chips and
+     small controls. No noise: up to 24 of these render at once. */
+  .glass-subtle {
+    --glass-hi: rgb(255 255 255 / 0.12);
+    background-color: color-mix(in srgb, var(--surface-subtle) 100%, rgb(var(--glass-tint) / 1) 6%);
+    background-image: linear-gradient(180deg, var(--glass-hi), transparent 1px);
+    border: 1px solid var(--surface-border);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    backdrop-filter: blur(12px) saturate(140%);
+  }
 
-.glass-hover:hover {
-  background: var(--surface-strong);
-  border-color: var(--surface-ring);
-}
+  /* Light scenes: brighter top highlight + faint bottom shade so glass
+     reads against pale skies (v1 light-surface invisibility fix). */
+  [data-surface="light"] .glass,
+  [data-surface="light"] .glass-strong,
+  [data-surface="light"] .glass-subtle {
+    --glass-hi: rgb(255 255 255 / 0.5);
+    --glass-lo: rgb(0 0 0 / 0.05);
+  }
 
-.text-surface {
-  color: var(--surface-text);
-}
+  [data-surface="light"] .glass-strong {
+    box-shadow:
+      inset 0 0 0 1px rgb(255 255 255 / 0.45),
+      var(--shadow-glass-lg);
+  }
 
-.text-surface-muted {
-  color: var(--surface-muted);
-}
+  .glass-hover {
+    transition:
+      background-color 250ms var(--ease-soft),
+      border-color 250ms var(--ease-soft),
+      box-shadow 250ms var(--ease-soft),
+      transform 250ms var(--ease-out-expo);
+  }
 
-.text-surface-faint {
-  color: var(--surface-faint);
-}
+  .glass-hover:hover {
+    background-color: color-mix(in srgb, var(--surface-strong) 100%, rgb(var(--glass-tint) / 1) 8%);
+    border-color: var(--surface-ring);
+  }
 
-.border-surface {
-  border-color: var(--surface-border);
-}
+  .text-surface {
+    color: var(--surface-text);
+  }
 
-.tnum {
-  font-variant-numeric: tabular-nums;
-}
+  .text-surface-muted {
+    color: var(--surface-muted);
+  }
 
-/* Focus visibility — WCAG-friendly, only on keyboard nav */
-.focus-ring:focus-visible {
-  outline: 2px solid var(--surface-ring);
-  outline-offset: 2px;
-  border-radius: 6px;
-}
+  .text-surface-faint {
+    color: var(--surface-faint);
+  }
 
-/* ------------------------------------------------------------------ */
-/* Slim scrollbars (hourly strip, dropdowns)                           */
-/* ------------------------------------------------------------------ */
+  .border-surface {
+    border-color: var(--surface-border);
+  }
 
-.scroll-slim {
-  scrollbar-width: thin;
-  scrollbar-color: var(--surface-border) transparent;
-}
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
 
-.scroll-slim::-webkit-scrollbar {
-  height: 6px;
-  width: 6px;
-}
+  /* Focus visibility — keyboard only; a rounded-* utility on the same
+     element overrides the fallback radius so pill buttons ring true. */
+  .focus-ring:focus-visible {
+    outline: 2px solid var(--surface-ring);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
 
-.scroll-slim::-webkit-scrollbar-track {
-  background: transparent;
-}
+  /* Slim scrollbars (hourly strip, dropdowns) */
+  .scroll-slim {
+    scrollbar-width: thin;
+    scrollbar-color: var(--surface-border) transparent;
+  }
 
-.scroll-slim::-webkit-scrollbar-thumb {
-  background: var(--surface-border);
-  border-radius: 999px;
-}
+  .scroll-slim::-webkit-scrollbar {
+    height: 6px;
+    width: 6px;
+  }
 
-.scroll-slim::-webkit-scrollbar-thumb:hover {
-  background: var(--surface-ring);
-}
+  .scroll-slim::-webkit-scrollbar-track {
+    background: transparent;
+  }
 
-.no-scrollbar {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
+  .scroll-slim::-webkit-scrollbar-thumb {
+    background: var(--surface-border);
+    border-radius: 999px;
+  }
 
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
+  .scroll-slim::-webkit-scrollbar-thumb:hover {
+    background: var(--surface-ring);
+  }
 
-/* ------------------------------------------------------------------ */
-/* Skeleton shimmer                                                    */
-/* ------------------------------------------------------------------ */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
 
-.skeleton {
-  position: relative;
-  overflow: hidden;
-  background: var(--surface-subtle);
-  border-radius: 10px;
-}
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 
-.skeleton::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    100deg,
-    transparent 20%,
-    rgb(255 255 255 / 0.14) 50%,
-    transparent 80%
-  );
-  background-size: 200% 100%;
-  animation: shimmer 1.8s linear infinite;
+  /* Skeleton shimmer — sweep tinted by --surface-text so it reads on
+     both dark and light scenes. */
+  .skeleton {
+    position: relative;
+    overflow: hidden;
+    background: var(--surface-subtle);
+    border-radius: 10px;
+  }
+
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      100deg,
+      transparent 20%,
+      color-mix(in srgb, var(--surface-text, #f2f7f5) 16%, transparent) 50%,
+      transparent 80%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.8s linear infinite;
+  }
 }
 
 /* ------------------------------------------------------------------ */

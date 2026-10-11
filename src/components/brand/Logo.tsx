@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { cn } from '@/lib/utils';
 
 interface LogoMarkProps {
@@ -9,6 +10,9 @@ interface LogoMarkProps {
  * rendered as an inline SVG (gradient aurora teal, mist strokes).
  */
 export function LogoMark({ className }: LogoMarkProps) {
+  // Namespaced gradient id — the mark can appear twice on a page (menu bar +
+  // footer) without duplicate DOM ids.
+  const gradientId = useId().replace(/[^a-zA-Z0-9]/g, '');
   return (
     <svg
       viewBox="0 0 64 64"
@@ -17,12 +21,12 @@ export function LogoMark({ className }: LogoMarkProps) {
       className={cn('h-9 w-9', className)}
     >
       <defs>
-        <linearGradient id="aether-mark-g" x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id={`aether-mark-g-${gradientId}`} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#45D1B3" />
           <stop offset="1" stopColor="#0F5F55" />
         </linearGradient>
       </defs>
-      <rect width="64" height="64" rx="16" fill="url(#aether-mark-g)" />
+      <rect width="64" height="64" rx="16" fill={`url(#aether-mark-g-${gradientId})`} />
       <circle cx="32" cy="29" r="10" fill="#F6FEFB" />
       <path
         d="M12 40 q5 -5 10 0 t10 0 t10 0 t10 0"

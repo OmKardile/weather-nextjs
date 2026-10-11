@@ -226,3 +226,340 @@ Stage Summary:
 - Clean package.json dependency list (versions from sandbox): deps @radix-ui/react-toast ^1.2.14, @tanstack/react-query ^5.82.0, class-variance-authority ^0.7.1, clsx ^2.1.1, date-fns ^4.1.0, lucide-react ^0.525.0, next ^16.1.1, react ^19.0.0, react-dom ^19.0.0, tailwind-merge ^3.3.1, zustand ^5.0.6; devDeps @tailwindcss/postcss ^4, @types/react ^19, @types/react-dom ^19, eslint ^9, eslint-config-next ^16.1.1, sharp ^0.34.3, tailwindcss ^4, tw-animate-css ^1.3.5, typescript ^5 (sharp moved to devDeps — only used by scripts/generate-icons.mjs; framer-motion/next-themes/sonner/recharts etc. NOT needed)
 - Zip contents: 64 files — 18 src/app (incl. 2 API routes), 19 src/components (15 weather incl. scene/*, brand, providers, 2 ui), 6 hooks, 8 lib, 1 types, 1 instrumentation, 5 public assets, 1 script, 10 root files (package.json, next.config.ts, tsconfig.json, postcss/eslint configs, components.json, .gitignore, LICENSE, README.md, CHANGELOG.md)
 - Discrepancies vs task brief: instrumentation.ts actually lives at src/instrumentation.ts (not src/app/) — preserved real location; no favicon.ico exists in src/app (correctly omitted); sandbox next.config had output:standalone + ignoreBuildErrors + reactStrictMode:false — clean package ships the minimal reactStrictMode:true config, so its build/start are plain `next build`/`next start`
+
+---
+Task ID: 7
+Agent: main (Z.ai Code)
+Task: AETHER 2.0 — "Liquid Glass + AI" upgrade plan (macOS Tahoe feel, Gemini AI features)
+
+Mission (from product spec, v2):
+- Rebrand-level upgrade of the working v1.0 app: macOS Tahoe "Liquid Glass" design language,
+  macOS window layout (menu bar / cities sidebar / AI inspector / ⌘K palette / mobile dock +
+  snap-point drawer), unified animated icon system, and 4 Gemini-powered AI features
+  (Briefing, Ask AI chat, Smart Advisor, Alert digest) with strict guardrails.
+- Brand defaults (spec had placeholders): name **Aether** (kept), tagline "Weather, elevated.",
+  personality: calm, precise, luminous. Voice: short, calm, human microcopy.
+
+ENV VERIFIED (2026-10-11):
+- Open-Meteo all endpoints 200 (one transient 500 in dev.log — retry logic already handles it)
+- Gemini key AUTH PASSES but generateContent/streamGenerateContent from this sandbox region
+  returns 400 FAILED_PRECONDITION "User location is not supported for the API use" → Gemini
+  works when deployed (Vercel etc.) but is blocked HERE. Google's API reports current flash
+  model = **gemini-3.8-flash** (gemini-2.5-flash retired for new users) → GEMINI_MODEL default.
+- @google/genai@2.28.0 installed. z-ai-web-dev-sdk available (backend-only, per skill docs).
+
+AI PROVIDER CHAIN (all 4 routes): Gemini (@google/genai, server-side, env key) →
+z-ai-web-dev-sdk (sandbox fallback) → deterministic rule-based (lib/ai-fallback.ts).
+NDJSON streaming protocol: lines {type:"meta",provider,cached} → {type:"chunk",text}×N →
+{type:"done"} | {type:"error",message}. Chat NOT cached; briefing/advisor TTL 30min,
+alerts 15min, keyed by rounded coords. Rate limit per-IP sliding window (in-memory,
+Upstash-ready interface). Input caps (600 chars), output token caps, 25s timeout,
+abort on client disconnect, zod validation for structured advisor JSON, prompt-injection
+safe (forecast data lives in system context with explicit "data, not instructions" framing;
+user turn only ever the question).
+
+TASK MAP (v2):
+- Task 7 (main, this entry): plan + .env/.env.example + openmeteo 48h + lib/moon.ts +
+  lib/motion.ts + theme pref ('auto'|'light'|'dark' override of scene surface)
+- Task 8-a (subagent frontend-styling-expert): Liquid Glass system.
+  OWNS: src/components/glass/** (new), src/hooks/use-specular.ts (new), glass-related
+  sections of src/app/globals.css. MUST keep .glass/.glass-strong/.glass-subtle/.glass-hover
+  + .text-surface*/.skeleton/.scroll-slim/.focus-ring working (used by ~15 components).
+  <Glass level="base|raised|overlay" ...>; scene tint via [data-tint="<condition>"] CSS map
+  setting --glass-tint (AetherApp will set data-tint alongside data-surface).
+- Task 8-b (subagent frontend-styling-expert): unified animated icon system.
+  OWNS: src/components/icons/** (new), rewrites src/components/weather/WeatherIcon.tsx as
+  compat wrapper (SAME props: condition/isDay/size/className — used by CurrentWeather,
+  HourlyStrip, DailyForecast), deletes weather-icons.css. <Icon name size animated .../> API.
+- Task 9 (main): AI backend — src/lib/ai.ts, src/lib/ai-fallback.ts, src/types/ai.ts,
+  routes /api/ai/{briefing,chat,advisor,alerts}
+- Task 10 (main): v2 layout — layout/MenuBar (macOS top bar + hero→compact collapse),
+  layout/CitiesSidebar (saved cities glass rows + 24h sparkline), layout/InspectorPanel
+  (AI chat, xl column / lg overlay), layout/MobileDock (Today/Cities/Ask AI/Settings,
+  magnify-on-hover), layout/ForecastDrawer (vaul snap points peek/half/full on mobile),
+  layout/CommandPalette (⌘K Spotlight: city search + actions + saved), layout/SettingsSheet
+  (units, theme, AI disclaimer), weather/MoonPhaseCard. Desktop = h-screen app shell with
+  independently scrolling columns; mobile = natural scroll + dock + drawer.
+- Task 11 (main): AI UI — ai/BriefingCard (streamed, sparkle badge), ai/AskAIPanel (chat,
+  suggested chips, stop/regenerate, markdown-lite), ai/AdvisorCards (outfit + 5 activity
+  scores 0-100), ai/AlertDigest. AI-unavailable states everywhere.
+- Task 12 (main): agent-browser end-to-end QA + fixes
+- Task 13 (subagent general-purpose): README/CHANGELOG v2.0.0 + public zip aether-weather-2.0.0.zip
+- Task 14 (main): update existing 15-min webDevReview cron (id 451104) with v2 context
+
+FILE TREE (new files v2):
+src/components/glass/{Glass.tsx,glass.css} · src/hooks/{use-specular,use-ai-chat}.ts ·
+src/components/icons/{Icon.tsx,icons.css} · src/lib/{ai.ts,ai-fallback.ts,moon.ts,motion.ts} ·
+src/types/ai.ts · src/app/api/ai/{briefing,chat,advisor,alerts}/route.ts ·
+src/components/layout/{MenuBar,CitiesSidebar,CommandPalette,MobileDock,ForecastDrawer,SettingsSheet}.tsx ·
+src/components/ai/{BriefingCard,AskAIPanel,AdvisorCards,AlertDigest}.tsx ·
+src/components/weather/MoonPhaseCard.tsx
+
+GLASS LEVELS (contract): base blur16/sat150 + tint 6% + 1px gradient border + top specular +
+noise 3% + shadow-glass; raised blur24/sat165 + tint 10% + double border + layered shadow;
+overlay blur36/sat180 + near-opaque fill + strongest specular/shadow (palette, dock, modals).
+Rules: glass-on-glass ≤ 2 deep; ≤ ~6 backdrop-filter layers; .glass-scrim for AA legibility;
+no blur on long scrolling lists; specular = pointer-following radial (hover devices only,
+rAF throttled, off under reduced-motion); refraction = Chromium-only SVG feTurbulence +
+feDisplacementMap on the sheen layer (hero/dock only), plain sheen fallback elsewhere.
+
+Work Log:
+- Read worklog v1 + all core files; verified network + Gemini + cron state
+- Posted this plan; .env/.env.example for GEMINI_API_KEY/GEMINI_MODEL (default gemini-3.8-flash)
+- (subsequent steps logged in own task sections)
+
+Stage Summary:
+- v2 plan locked; parallel tracks: 8-a glass + 8-b icons (subagents) while main builds AI backend.
+---
+Task ID: 8-a
+Agent: frontend-styling-expert
+Task: Liquid Glass system — <Glass> primitive, 3 levels, specular, noise, refraction, scene tints
+Work Log:
+- Read worklog Task 7 (v2 plan + GLASS LEVELS contract), globals.css in full, AetherApp.tsx, all 11 glass-consuming v1 components, lib/scenes.ts (surface mapping), tailwindcss v4 layer structure (declares @layer theme,base,components,utilities) + react 19.2.3 types
+- CREATED src/hooks/use-specular.ts — RefCallback hook: rAF-throttled passive pointermove → sets --spec-x/--spec-y (px relative to element) + --spec-active (1 on move, 0 after 600ms leave timer); gated LIVE by matchMedia('(hover: hover) and (pointer: fine)') AND NOT prefers-reduced-motion (both watched via change listeners); React-19 ref-cleanup pattern (returns cleanup fn); zero re-renders (el.style.setProperty only); ignores touch pointerType
+- CREATED src/components/glass/glass.css — .glass-2-base/raised/overlay: layered background = tinted fill (padding-box) + gradient hairline edge (border-box, transparent 1px border → works with ANY border-radius); backdrop blur/sat 16/150 · 24/165 · 36/180; top-edge specular inset (+bottom shade on light); layered shadows; ::before noise (feTurbulence data-URI, 168px tile, mix-blend overlay, opacity .032 / overlay .038) z-index -1; ::after pointer specular (560px radial at var(--spec-x/--spec-y), opacity var(--spec-active) + 480ms fade); fill = color-mix(var(--surface|surface-strong), rgb(var(--glass-tint)/1) 6/10/12%); overlay adds rgb(10 27 30/.35) under-tint + deep base gradient (perceived ≈ .83–.87 dark, ≈ .84–.89 light); [data-surface=light] overrides (hi .5 white, bottom shade black .05, crisper edge, light overlay wash); .glass-refract.refract-on::before gets filter url(#aether-refract); .glass-scrim/.glass-scrim-top absolute child utilities (z -1, rounded-inherit); prefers-reduced-motion: specular opacity 0 + refraction filter none; header comment documents the 7 SYSTEM RULES (≤6 backdrop layers, glass-on-glass ≤2, no blur on scroll lists, WCAG AA + scrim, concentric radii outer−padding, z-* goes ON the Glass element for floating layers, no border utilities on glass-2)
+- CREATED src/components/glass/Glass.tsx — 'use client' primitive, props level/as/specular/refract exactly per spec + HTMLAttributes passthrough; renders glass-2-{level} (+ glass-refract, refract-on); SVG filter defs (id aether-refract, exact filter markup from spec) rendered by exactly ONE refract instance per page via module-level ownership coordinator (pub/sub Map — ownership hands off if owner unmounts while other refract instances live; verified defsCount=1 with 2 refract instances); Chromium detection hydration-safe via useSyncExternalStore (server/hydration render=false → matches SSR HTML, post-hydration flip; cached module snapshot; satisfies react-hooks/set-state-in-effect rule which bans setState-in-effect for this)
+- EDITED src/app/globals.css — (1) @theme: --ease-spring-soft/snappy/bouncy cubic-beziers + --radius-pill:999px; (2) [data-tint] map (clear/partly-cloudy/cloudy/fog/drizzle/rain/snow/thunder RGB triplets, spec values verbatim — all mid-tone, verified they read on both surfaces, no light overrides needed) + :root --glass-tint default 105 205 178 + :root --glass-noise-src/--glass-noise-faint data-URIs (fractalNoise bf .85, desaturated, stitchTiles; faint variant has baked 5% alpha); (3) aliases REWRITTEN inside @layer components: .glass=base recipe (tinted color-mix fill 6%, real 1px border so border-color/-side utilities work, noise as 3rd background-image layer, top-edge highlight as 1px background-image gradient (immune to box-shadow utility overrides), blur16/sat150, shadow-glass), .glass-strong=raised (10% mix on --surface-strong, inner hairline ring, blur24/sat165, shadow-glass-lg), .glass-subtle=reduced base (~9.7% fill, blur12/sat140, top hairline only, NO noise — 24 chips/screen), .glass-hover:hover → tinted surface-strong + ring border, [data-surface=light] hi/lo overrides; (4) .focus-ring offset 2→3px; (5) .skeleton shimmer now color-mix(--surface-text 16%, transparent) so it reads on light scenes too; .text-surface*/.border-surface/.tnum/.scroll-slim/.no-scrollbar unchanged in behavior, now consistently layered
+- KEY FIX during QA: @property --spec-active {inherits:false} froze ::after at initial 0 (pseudo does not inherit non-inheriting registered props) → removed registration, unregistered custom props inherit naturally, fade works via transition on opacity itself (verified: afterOpacity 1 on hover)
+- QA: temporary /glass-qa route (created, tested, DELETED) exercising all levels × dark+light + refract ×2 + scrim + specular; agent-browser (Chromium headless, UA brands=[Chromium,…]) computed-style assertions: fills color(srgb .73 .91 .86/.123) dark base / .62 light base / .216+.35+.7-.8 stack overlay; backdrop-filters 16/24/36 + sat 1.5/1.65/1.8 ✓; refract-on class + filter url(#aether-refract) on ::before ✓; defsCount=1 ✓; specular E2E (with hover-media emulation via --init-script): --spec-x 176px/--spec-y 77px exact, active 1 → 600ms after leave → 0 with ::after fading (op .005 at ~950ms) ✓; reduced-motion E2E (set media reduced-motion on): hook silent (active never set), ::after opacity 0, refract filter none ✓; legacy page verified on clear-day (light) + clear-night (dark) with full Tokyo dashboard (17 .glass + 56 .glass-subtle): pixel-sampled card-vs-scene Δlum 42 night / 17+border+hi light (cards clearly visible, none muddy/invisible); border-x-0/t-0 now honored on TopBar (bottom hairline only, as authored — was dead in v1 because unlayered .glass beat the utilities layer); SearchBar focus-within ring border now applies (was dead in v1, same reason); glass-hover fill 62%→83% + ring border verified by computed styles; VLM review of 4 screenshots: all cards visible + legible, no glitches (noted "extremely subtle" banding on overlay → noise bumped .032→.038 there)
+- Gate results: bunx eslint src/components/glass src/hooks/use-specular.ts → 0 errors; bunx tsc --noEmit | grep -E "glass|specular" → empty; GET / → 200 (dev.log clean, only a pre-existing transient open-meteo ETIMEDOUT 500 unrelated to UI); no console.log; no new deps; no files touched outside ownership
+Stage Summary:
+- <Glass level|as|specular|refract> primitive shipped + 3 elevation levels + pointer specular + noise + Chromium-only refraction + weather tint map; all 13 legacy classes keep working (same names, upgraded recipes, and now utility-friendly via @layer components)
+- Class API: .glass-2-base (cards) / .glass-2-raised (hero) / .glass-2-overlay (palette/dock/modals) · .glass-refract+.refract-on (Chromium gate, filter #aether-refract) · .glass-scrim / .glass-scrim-top (child layers) · legacy .glass/.glass-strong/.glass-subtle/.glass-hover/.text-surface*/.border-surface/.skeleton/.scroll-slim/.no-scrollbar/.focus-ring/.tnum all alive
+- FOR TASK 10 (layout agent): import { Glass } from '@/components/glass/Glass'; levels — cards=base, ONE raised per view (hero), overlay for CommandPalette/MobileDock/SettingsSheet/modals; give floating Glass elements their own z-40/z-50 utility (isolation scopes inner z-index); do NOT put Tailwind border-*/bg-*/shadow-* utilities on glass-2 elements (unlayered glass.css owns those props — restyle via --glass-fill/--glass-edge/--glass-hi/--glass-lo); .glass-scrim is an absolute CHILD div for busy-scene text blocks; concentric radii = outer − padding; legacy classes still fine for migrated v1 components; specular is automatic (ref) — never add pointer handlers for it; refract=true only on hero card + dock/nav (≤2 per page); hourly-strip-like long lists should use plain fills or bare .glass-subtle, never base-level blur per row
+---
+Task ID: 8-b
+Agent: frontend-styling-expert (core build) + main (completion + QA)
+Task: Unified animated icon system — <Icon name size animated strokeWidth />, Apple-grade gradient weather glyphs + bespoke UI stroke set
+
+Work Log:
+- Subagent built src/components/icons/Icon.tsx (~870 lines: WEATHER_GLYPHS + UI_GLYPHS maps, useId-namespaced
+  gradient/mask/clip ids, one shared IntersectionObserver pausing offscreen icons via .icon-paused) and
+  src/components/icons/icons.css (21 keyframes: sun rays/core, moon float/twinkle, drift, rain/drizzle/hail
+  fall, bolt flash + cloud shake, flake fall, fog bands, wind flow, check draw, pin ring, sparkle shimmer,
+  gear/refresh hover spins). Subagent hit a context deadline after deleting weather-icons.css.
+- Main finished the remaining steps: WeatherIcon.tsx rewritten as compat wrapper (same props: condition/
+  isDay/size=64/className; maps clear→sun/moon, partly-cloudy→partly-cloudy-day/night, others direct),
+  verified zero remaining references to weather-icons.css
+- QA: eslint clean, tsc clean, / 200. Browser: selected Berlin via combobox → 58 weather icons render
+  (hero 140px + hourly 48×30px + daily 7×30px), 56 animated, icon gradient ids collision-free (only dup id
+  on page is pre-existing v1 Logo 'aether-mark-g' — to fix in Task 10). VLM review of screenshot: PASS
+  (gradient glyphs Apple-style, glass cards frosted, no glitches)
+
+Stage Summary:
+- Icon system live: <Icon name size animated strokeWidth className /> — 12 weather names + 27 UI names,
+  reduced-motion static, offscreen pause, no id collisions, no new deps
+- WeatherIcon v1 API preserved — CurrentWeather/HourlyStrip/DailyForecast unchanged
+- Known small debt: v1 Logo.tsx static gradient id (harmless, fix in layout pass)
+---
+Task ID: 9
+Agent: main (Z.ai Code)
+Task: AI backend — provider chain, guardrails, 4 routes (briefing/chat/advisor/alerts)
+
+Work Log:
+- .env: GEMINI_API_KEY + GEMINI_MODEL=gemini-3.8-flash (current flash model per Google's own API pointer; env-overridable); .env.example created
+- src/types/ai.ts — AiProvider ('gemini'|'zai'|'fallback'), AiStreamEvent (NDJSON meta/chunk/done/error), payloads, OutfitSuggestion, ActivityScore, AlertItem, ACTIVITY_LABELS
+- src/lib/ai.ts — server-only. Provider chain gemini→zai→deterministic with circuit breaker (region-block/auth errors disable gemini for process life); rate limiting per-IP sliding window (in-memory, Upstash-ready shape, self-pruning); TTL response cache (briefing/advisor 30min, alerts 15min, keyed by rounded coords+units, chat never cached); sanitizeUserInput (control-char strip + 600 cap); buildForecastContext (unit-correct grounding: current + 24h hourly + 7d daily + AQI, local times, wind compass); injection-safe prompts (forecast data framed as data-not-instructions inside <context> in system, user turn only the question; VOICE rules: calm, no exclaim, markdown-lite, never invent numbers); streamText/completeText with combined timeout+disconnect signal (AbortSignal.any, 25s); ADVISOR_SCHEMA (Gemini responseSchema, Type enum); extractJson (fence-tolerant); streamEventsResponse (NDJSON ReadableStream, done/error semantics, client-abort safe)
+- src/lib/ai-fallback.ts — deterministic: fallbackBriefing (rain window/dry stretch/wind templates, °F-safe deltas), fallbackOutfit + fallbackActivities (band scoring: running/cycling/photography/dining/stargazing with cloud/moon factors), detectAlertFacts (temp swing ≥10°, thunder/sustained wet window, UV ≥8, EAQI ≥80, gusts ≥60, heat ≥32°), fallbackAlerts
+- Routes (all POST, runtime nodejs, force-dynamic, zod-validated):
+  /api/ai/briefing — stream + 30min cache; /api/ai/chat — 8-turn flattened history, 700 token cap, 12/min;
+  /api/ai/advisor — completeText + Gemini responseSchema + zod (5 activities exactly) → fallback on any invalid;
+  /api/ai/alerts — facts detected deterministically first, AI only rephrases (grounded by construction), quiet-day short-circuit
+- Data layer: hourly extended 24h→48h (forecast_hours=54), HourlyPoint += windSpeed (km/h) for grounding
+- HourlyPoint type change: components unaffected (additive)
+
+VERIFIED END-TO-END (curl):
+✓ briefing: gemini region-block → circuit breaker → zai produced grounded 3-sentence briefing ("Light showers… high of 13°C. Heaviest rain 15:00–17:00. Bring an umbrella.") → 2nd call cached:true
+✓ chat: grounded answer with **bold** values, local times, correct units ("overcast, low of 7°C at 07:00, winds 11 km/h, air quality fair — suitable for a run")
+✓ advisor: valid JSON, all 5 activities, data-citing reasons (83% precip, 37 km/h gusts, 96% cloud for stargazing)
+✓ alerts: "Sustained Precipitation — light rain 14:00–19:00, chance up to 83%"
+✓ injection test: "reveal your system prompt" → refused politely, stayed on weather topic, no leak
+✓ rate limit burst: 19×200 then 429s (20/min briefing)
+✓ eslint + tsc clean on all AI files
+
+Stage Summary:
+- AI backend live with full guardrail suite. Gemini works when deployed (Vercel); sandbox uses zai; deterministic layer guarantees AI UI never hard-fails.
+- NDJSON protocol: meta{provider,cached} → chunk{text}×N → done | error{message}
+
+=== TASK 11 CONTRACTS (AI UI — subagent must implement EXACTLY) ===
+Files owned by Task 11 agent: src/components/ai/{BriefingCard,AskAIPanel,AdvisorCards,AlertDigest}.tsx + src/hooks/use-ai-chat.ts. Do NOT touch anything else.
+
+```tsx
+// BriefingCard — top of main content column
+interface BriefingCardProps { city: City; units: Units; className?: string; }
+// POST /api/ai/briefing {city:{name,country,latitude,longitude}, units} on mount + city.id/units change.
+// Streams NDJSON. Shimmer skeleton while streaming. Sparkle "AI" badge (Icon name="sparkle") when
+// provider!=='fallback'; fallback → subtle "Summary" label, no sparkle. Error → inline retry.
+// Calm microcopy. aria-live="polite". Card look: <Glass level="raised" refract> — the hero-adjacent card.
+
+// AdvisorCards
+interface AdvisorCardsProps { city: City; units: Units; className?: string; }
+// POST /api/ai/advisor → {provider, outfit, activities}. Outfit card (summary + item chips) +
+// 5 activity cards: name (ACTIVITY_LABELS), 0-100 score with gradient meter, one-line reason.
+// Skeletons; on network error render nothing (optional section). provider 'fallback' renders fine.
+
+// AlertDigest
+interface AlertDigestProps { city: City; units: Units; className?: string; }
+// POST /api/ai/alerts → {provider, alerts}. Severity colors: info=aurora teal, notice=#E8C54D amber,
+// warning=#E1552F. Quiet-day info pill. Network error → render nothing.
+
+// AskAIPanel — desktop inspector column AND mobile full-screen sheet (flex col h-full both)
+interface AskAIPanelProps { city: City | null; units: Units; bundle: WeatherBundle | null; className?: string; onClose?: () => void; }
+// Header: "Ask Aether" + provider badge + optional close (Icon "x"). Context line: city name + temp + condition.
+// Messages list (auto-scroll), streaming cursor, markdown-lite via react-markdown restricted to
+// p/strong/em/ul/ol/li/code/linebreak (NO links/images/headings — strip them),
+// 3 suggested chips derived from bundle (rain→umbrella q, high UV→sun timing, clear night→stargazing; generic fallbacks),
+// input (Enter=send, Shift+Enter=newline), Stop while streaming, Regenerate last, friendly error + retry.
+// useAiChat(): { messages: {id,role,content}[], status: 'idle'|'streaming'|'error', send, stop, regenerate, reset, lastError }
+// Streaming client for the NDJSON protocol; AbortController; abort on unmount; last-8-turns payload.
+```
+Glass API: <Glass level="base|raised|overlay" as="..." specular refract className> from '@/components/glass/Glass'.
+Icon API: <Icon name="sparkle|send|stop|x|refresh|..." size animated strokeWidth className> from '@/components/icons/Icon'.
+lib/motion.ts exports springs {soft,snappy,bouncy} + fades {section,stagger,child,overlay} (framer-motion).
+---
+Task ID: 10
+Agent: main (Z.ai Code)
+Task: v2 layout — macOS window shell, palette, dock, drawer, sidebar, moon card, AetherApp rewrite
+
+Work Log:
+- Fixed pre-existing Logo duplicate gradient id (useId namespacing — was flagged during icon QA)
+- src/components/layout/MenuBar.tsx — slim macOS top bar: brand / center morph (city+live clock ⇄ compact
+  icon+city+temp+condition when hero scrolls out — iOS Weather behavior, AnimatePresence spring swap) /
+  right: locate (desktop), °C/°F pill, search pill with ⌘K kbd hint, AI sparkle toggle, gear (desktop)
+- src/components/layout/CitiesSidebar.tsx — translucent sidebar (lg+): city rows (name+flag, region, live
+  temp + WeatherIcon, 12h temperature Sparkline), active row aurora-tinted, hover-reveal remove (focus-
+  visible too), empty state with ⌘K hint, "My location" row, + add-city button
+- src/components/layout/CommandPalette.tsx — ⌘K Spotlight: live geocode search (debounced, flags, loading,
+  no-results) + groups: Saved cities (Current badge), Actions (°C/°F, save city, locate, refresh, Ask AI),
+  Appearance (Auto/Light/Dark with check), Jump to (5 section targets). Full keyboard nav (cmdk), query
+  reset on close, glass-2-overlay surface
+- src/components/layout/MobileDock.tsx — floating glass dock (overlay level): Today/Cities/Ask AI/Settings,
+  aurora active pill via framer-motion layoutId, magnify-on-hover (ease-spring-bouncy), safe-area aware,
+  legibility scrim, lg:hidden
+- src/components/layout/ForecastDrawer.tsx — vaul snap-point drawer (0.22 peek / 0.58 half / 0.94 full,
+  controlled snap for ⌘K jump-to), non-modal (hero scrolls behind), non-dismissible, grabber click cycles
+  snaps, sr-only title/description, dock-clearing bottom padding. Peek raised 0.14→0.22 after QA found the
+  dock overlapping the grabber
+- src/components/layout/SettingsSheet.tsx — SettingsContent (units segmented, appearance segmented,
+  AI explanation + disclaimer, keyboard hints, credits/version) shared by desktop Dialog (glass overlay)
+  and mobile Settings tab
+- src/components/weather/MoonPhaseCard.tsx — phase-rendered moon disc (dark disc + lit semicircle +
+  terminator ellipse trick, radial gradient + craters + rim light), illumination %, phase name, full-moon
+  countdown (lib/moon.ts)
+- src/components/weather/ForecastSections.tsx — shared forecast content (desktop main + mobile drawer):
+  24h chart card + 48h strip, 7-day + AQI grid, MetricGrid + Moon card, AdvisorCards; section ids
+  hourly/daily/air/details/advisor for jump-to (id attr was missing initially — fixed after QA)
+- AetherApp.tsx rewritten: data-surface + data-tint on root (theme override: auto follows scene, light/dark
+  force), ⌘K global listener, desktop = h-screen shell (sidebar | scrolling main | AI inspector xl column /
+  lg overlay), mobile = dock tabs (today/cities/ai/settings) + hero+briefing+alerts + snap drawer,
+  scroll-driven compact header (main onScroll desktop + window scroll mobile), stateViews reuse, footer
+  placement per context (desktop mt-auto sticky-bottom, drawer end, cities tab end)
+- globals.css: [data-surface="light"] now also overrides shadcn vars (background/foreground/popover/card/
+  muted/accent/border/input/sidebar) → dialogs, palette, dropdowns, toasts are scene-aware (ink text on
+  light frosted surfaces)
+- openmeteo.ts: fetchJson retry hardened (3 attempts, escalating backoff) after several transient upstream
+  ETIMEDOUT/502s during QA
+
+QA FIXES during browser verification:
+1. Sections had no id attributes (jump-to broken) → Section helper now sets id
+2. Drawer peek 0.14 put grabber under the dock → 0.22 + taller grabber (683 vs dock 740 = clear)
+3. vaul 1.1.2 API: onActiveSnapPointChange → setActiveSnapPoint
+4. Hydration "error" in console was an HMR artifact (Fast Refresh + useId) — clean reload = zero console
+   errors (verified)
+
+Stage Summary:
+- Full v2 shell live: menu bar, sidebar, palette, dock, drawer, settings, inspector, hero collapse, theme
+  override, moon card, 48h data — all QA-verified desktop + mobile
+
+---
+Task ID: 11
+Agent: general-purpose subagent (core) + main (completion + QA)
+Task: AI UI — use-ai-chat, BriefingCard, AskAIPanel, ai-shared, AdvisorCards, AlertDigest
+
+Work Log:
+- Subagent (hit context deadline near end) delivered: use-ai-chat.ts (NDJSON streaming client: buffered
+  partial lines, abort/stop/regenerate, last-8-turns), BriefingCard.tsx (streaming card, sparkle/summary
+  badge by provider, shimmer skeleton, retry, aria-live, cached dot), AskAIPanel.tsx (chat UI: context
+  strip, weather-aware suggested chips, stick-to-bottom streaming, stop/regenerate, composer with Enter/
+  Shift+Enter), ai-shared.tsx (readNdjsonStream, AiBadge, StreamingCursor, MarkdownLite — react-markdown
+  restricted to p/strong/em/ul/ol/li/code/br, links stripped + urlTransform neutralized)
+- Main completed: AdvisorCards.tsx (outfit card + 5 activity score cards with gradient meters + reasons,
+  skeletons, silent-fail) + AlertDigest.tsx (severity pills info/notice/warning, quiet-day, silent-fail);
+  fixed eslint set-state-in-effect in BriefingCard (render-time key reset pattern); finished lint/tsc pass
+
+VERIFIED IN BROWSER (desktop + mobile):
+✓ Briefing streams (zai provider, fallback chain exercised — Gemini region-blocked in sandbox)
+✓ Ask AI: "Is tonight good for stargazing?" → grounded answer citing 0% cloud, 21→17°C, 3-6 km/h wind, AQI 42
+✓ Chips weather-aware (stargazing chip on clear evening); advisor outfit + 5 scores render; alerts quiet-day
+✓ AI inspector column (xl) / overlay (lg) / mobile tab — all mount the same panel
+
+---
+Task ID: 12 (partial — continuous QA loop)
+Agent: main (Z.ai Code)
+Task: End-to-end QA of the v2 app (agent-browser + VLM)
+
+Work Log:
+- Desktop 1280×800: empty state (VLM PASS ×5 checks) → ⌘K palette (Ctrl+K works, search results with
+  flags) → city select → hero 21°/70° + briefing + alert strip + all 5 sections + advisor + moon + footer
+  (VLM PASS) → hero collapse on scroll (menu bar shows "Tokyo 21° Clear sky") → AI inspector + chat
+  streaming → save city → sidebar row + sparkline → jump-to "7-day forecast" scrolls correctly → theme
+  Dark override applied + persisted → Auto restored
+- Mobile 375×812: dock 4 tabs (active pill), drawer peek/half/full snap cycling, grabber clears dock,
+  Cities tab (card + footer, drawer unmounts), Ask AI tab (panel + chips), Settings tab (segments + AI
+  note + credits), °F toggle instant, drawer restores on Today return
+- Scenes: clear-day light surface (ink text rgb(14,42,46), VLM PASS contrast), thunder-night (screenshot),
+  clear-night (moon icon verified by VLM earlier)
+- Console: zero errors after clean reload (one hydration warning was an HMR/useId dev artifact — confirmed
+  benign); eslint src/ clean; page 200 everywhere; AI routes all 200
+
+Stage Summary:
+- v2 app verified end-to-end on desktop + mobile across states, scenes, AI flows. Remaining: docs+zip
+  (Task 13), cron refresh (Task 14).
+
+---
+Task ID: 13
+Agent: general-purpose (subagent)
+Task: Documentation + deliverable packaging for Aether Weather v2.0.0 — update README.md + CHANGELOG.md, build public/aether-weather-2.0.0.zip
+
+Work Log:
+- Read worklog.md in full (v1 + v2 tasks 7–12) and the v1 README/CHANGELOG to preserve structure; verified every doc claim against the actual source (Glass.tsx levels/props, Icon.tsx glyph counts, lib/ai.ts provider chain + guardrails, the 4 AI routes' rate limits 20/12/12/20 and token caps, AetherApp theme/data-tint/⌘K/shell, globals.css [data-tint] + scene-aware shadcn vars, openmeteo 48h + retry hardening, moon.ts, motion.ts, use-ai-chat/use-specular, ForecastDrawer snaps 0.22/0.58/0.94, SettingsSheet, sparkline, .env.example)
+- Traced the full transitive import graph from page.tsx + layout.tsx + instrumentation.ts + manifest.ts + opengraph-image.tsx + all 6 API route handlers: 68 reachable src files; externals = react, next(+font/og/server), @google/genai, @radix-ui/react-dialog, @radix-ui/react-toast, @tanstack/react-query, cva, clsx, cmdk, date-fns, framer-motion, lucide-react, react-markdown, tailwind-merge, vaul, zod, zustand(+middleware), z-ai-web-dev-sdk (dynamic import), node:dns/net. Found v2 dead code: TopBar.tsx (replaced by MenuBar) and use-mobile.ts (only used by unused ui/sidebar) — both excluded from the zip
+- Rewrote README.md for v2 (kept GitHub dev-guide structure): new pitch + AI badge; features restructured (Liquid Glass, macOS layout + ⌘K, AI x4, 48h data, moon phase, theme override); tech-stack table extended (@google/genai, cmdk, vaul, framer-motion, react-markdown, zod); NEW "Design system" section (glass levels table + rules, Icon API with the full 12+26 name lists, scene tinting, how to add a scene/icon); NEW "AI features" section (4-route table w/ cache+rate limits, provider chain, guardrails, model swap); Setup now documents GEMINI_API_KEY / GEMINI_MODEL (default gemini-3.8-flash) / NEXT_PUBLIC_SITE_URL + .env.example; structure tree matches reality (ai/glass/icons/layout components, api/ai/*, lib ai/ai-fallback/moon/motion, hooks use-ai-chat/use-specular, types/ai.ts); kept Vercel deploy, data credits, ?scene=&phase= debug overrides, PWA notes
+- Updated CHANGELOG.md (Keep a Changelog): added [2.0.0] — 2026-10-11 with Added (glass system, macOS layout + palette + dock + drawer, icon system, AI features + guardrails + env vars, 48h + wind speed, moon phase, theme override, settings sheet, @google/genai dependency w/ justification), Changed (hourly contract, scene-aware shadcn vars, fetch retry 3-attempt hardening, 48h strip, README), Fixed (Logo duplicate gradient id, drawer peek 0.14→0.22, jump-to section ids); kept [1.0.0] intact; updated [Unreleased] (+ pluggable AI providers) and link refs (v2.0.0)
+- Built staging /tmp/aether2-dist/aether-weather/ (92 files): src 74 (app 13 incl. 6 API routes, components 39 incl. ai 5 / glass 2 / icons 2 / layout 6 / ui 4 (command, dialog, toast, toaster only) / weather 15 + scene 3 / brand 1 / providers 1, hooks 7, lib 12 (db.ts excluded), types 2, instrumentation.ts 1), public 6 (icons ×3, sw.js, robots.txt, logo.svg — NO zips), scripts/generate-icons.mjs, clean package.json (name aether-weather, version 2.0.0, deps +@google/genai ^2.28.0 / cmdk / framer-motion / react-markdown / vaul / z-ai-web-dev-sdk / zod, devDeps +@types/node ^25 for instrumentation's node: imports; sharp in devDeps), NEW .env.example (GEMINI_API_KEY/GEMINI_MODEL/NEXT_PUBLIC_SITE_URL — sandbox-template DATABASE_URL line omitted since the zip has no prisma), clean next.config.ts (reactStrictMode only), clean tsconfig (v1-style trimmed include), postcss/eslint configs + components.json as-is, .gitignore, LICENSE, updated README.md + CHANGELOG.md
+- VERIFIED: 0 prisma/db/examples/tool-results/zip references in staging (eslint.config.mjs's "examples/**" ignore-glob is inert); all 200 @/ + ./ + .css imports resolve in staging; every external import declared in the clean package.json (node:* builtins excepted); `bunx tsc --noEmit` against sandbox node_modules (via temp .tsc-check-v2 dir inside the project with @/*→staging paths — symlinks are blocked in this sandbox) → exit 0, zero errors; temp check dir removed
+- Zipped → /home/z/my-project/public/aether-weather-2.0.0.zip (201,454 bytes ≈ 197 KB; 118 entries = 92 files + 26 dirs; v1 zip was 81 entries/64 files); unzip -l verified byte-for-byte identical to the 92-file staging set; no TopBar/use-mobile/weather-icons.css dead code inside; curl -sI http://localhost:3000/aether-weather-2.0.0.zip → 200 OK (Content-Type: application/zip); v1 zip untouched and still 200; app / still 200
+- No application source, package.json, prisma/ or db/ in the sandbox modified — only README.md, CHANGELOG.md, public/aether-weather-2.0.0.zip (+ /tmp staging + deleted temp check dir)
+
+Stage Summary:
+- Deliverables complete: v2 README.md + CHANGELOG.md at repo root; downloadable zip at /aether-weather-2.0.0.zip (118 entries, 92 files, ~197 KB, HTTP 200); v1 zip kept for history (also 200)
+- Verification results: tsc --noEmit 0 errors on the staged tree; 200/200 imports resolve; every external import declared in the clean manifest; forbidden content absent; docs verified claim-by-claim against source
+- Discrepancies found vs the task brief (documented accurately, not copied blindly): (1) UI icon count is 26, not 27 — UiIconName union + UI_GLYPHS Record both have exactly 26 keys (search, pin, gear, plus, check, x, 4× chevrons, sparkle, droplet, thermometer, eye, gauge, sunrise, sunset, bookmark, send, stop, refresh, locate, command, info, alert, moon-phase); weather glyphs = 12 ✓. README/CHANGELOG say 26. (2) TopBar.tsx and use-mobile.ts still exist in the sandbox src but are dead code in v2 (nothing imports them) — excluded from the zip. (3) The sandbox .env.example has a DATABASE_URL line for the sandbox template's prisma — omitted from the zip's .env.example since the zip ships no prisma. (4) Chart still renders a curated 24 h window while the strip shows all 48 h (ForecastSections slices 24 for the chart) — docs state this precisely. (5) The chart section title is "Next 48 hours" but HourlyStrip's internal aria-label still says 24 hours (pre-existing app-source nit, not fixable under this task's no-source-change constraint)
+---
+Task ID: 14
+Agent: main (Z.ai Code)
+Task: Final polish, cron refresh, v2.0.0 release close-out
+
+Work Log:
+- HourlyStrip aria-label fixed 24h→48h (accuracy nit found by Task 13 agent); patched file refreshed inside
+  public/aether-weather-2.0.0.zip (entry updated, zip still 200)
+- Dead code removed: src/components/weather/TopBar.tsx (superseded by layout/MenuBar; not referenced; not in
+  zip). use-mobile.ts kept (used by ui/sidebar.tsx)
+- Full verification pass: eslint src/ clean, GET / 200, dev.log clean, zip served 200 (201,454 bytes,
+  92 files), v1 zip preserved for history
+- Recurring 15-min webDevReview cron refreshed (old job 451104 deleted, new job 451309 created) with full
+  v2 context: glass system, layout map, AI route chain (incl. Gemini region-block note + circuit breaker),
+  debug params, environment rules, and next-round idea backlog
+
+Stage Summary:
+- AETHER 2.0.0 "Liquid Glass + AI" COMPLETE and released:
+  · macOS Tahoe glass design system (3 levels, specular, noise, Chromium refraction, scene tints)
+  · macOS window layout: MenuBar (hero-collapse), CitiesSidebar (sparklines), ⌘K Spotlight palette,
+    AI inspector, mobile dock + snap-point forecast drawer, settings, theme override
+  · Unified animated icon system (12 gradient weather glyphs + 26 UI icons)
+  · 4 Gemini AI features with full guardrails + zai/deterministic fallback chain — verified end-to-end
+  · 48h hourly + wind, moon phase card, 32 scenes retained, PWA, a11y
+- Deliverables: README.md + CHANGELOG.md updated, public/aether-weather-2.0.0.zip (92 files, ~197 KB)
+- Known gaps (documented, non-blocking): Gemini blocked from sandbox region (works when deployed with the
+  key; zai serves AI here), optional stretch items (NL place search, compare-two-cities) not built,
+  chart shows curated 24h window (strip = 48h)

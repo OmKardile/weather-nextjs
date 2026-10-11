@@ -1,0 +1,870 @@
+     1→'use client';
+     2→
+     3→import { useEffect, useId, useRef } from 'react';
+     4→import type { ReactNode } from 'react';
+     5→import { cn } from '@/lib/utils';
+     6→import './icons.css';
+     7→
+     8→/* ================================================================== */
+     9→/* Aether unified icon system                                          */
+    10→/*                                                                    */
+    11→/* One component, two bespoke sets:                                   */
+    12→/*  • Weather glyphs — 64×64, filled, multi-layer, gradient-lit,      */
+    13→/*    softly animated (transform/opacity only).                       */
+    14→/*  • UI icons — 24×24, currentColor strokes, round caps/joins.       */
+    15→/*                                                                    */
+    16→/* All gradient / mask / clip ids are namespaced with React useId()   */
+    17→/* so dozens of icons can share a page (hourly strip) without         */
+    18→/* collisions. Animations are gated on the root `.ic-anim` class;     */
+    19→/* a shared IntersectionObserver pauses off-screen icons.             */
+    20→/* ================================================================== */
+    21→
+    22→export type WeatherIconName =
+    23→  | 'sun'
+    24→  | 'moon'
+    25→  | 'partly-cloudy-day'
+    26→  | 'partly-cloudy-night'
+    27→  | 'cloudy'
+    28→  | 'fog'
+    29→  | 'drizzle'
+    30→  | 'rain'
+    31→  | 'thunder'
+    32→  | 'snow'
+    33→  | 'wind'
+    34→  | 'hail';
+    35→
+    36→export type UiIconName =
+    37→  | 'search'
+    38→  | 'pin'
+    39→  | 'gear'
+    40→  | 'plus'
+    41→  | 'check'
+    42→  | 'x'
+    43→  | 'chevron-up'
+    44→  | 'chevron-down'
+    45→  | 'chevron-left'
+    46→  | 'chevron-right'
+    47→  | 'sparkle'
+    48→  | 'droplet'
+    49→  | 'thermometer'
+    50→  | 'eye'
+    51→  | 'gauge'
+    52→  | 'sunrise'
+    53→  | 'sunset'
+    54→  | 'bookmark'
+    55→  | 'send'
+    56→  | 'stop'
+    57→  | 'refresh'
+    58→  | 'locate'
+    59→  | 'command'
+    60→  | 'info'
+    61→  | 'alert'
+    62→  | 'moon-phase';
+    63→
+    64→export type IconName = WeatherIconName | UiIconName;
+    65→
+    66→export interface IconProps {
+    67→  /** Glyph to render. */
+    68→  name: IconName;
+    69→  /** Pixel size (square). Default 24. */
+    70→  size?: number;
+    71→  /** Enable looping weather animations / hover effects. Default true. */
+    72→  animated?: boolean;
+    73→  className?: string;
+    74→  /** Stroke width for UI (stroke) icons. Default 2. */
+    75→  strokeWidth?: number;
+    76→}
+    77→
+    78→const WEATHER_NAMES: ReadonlySet<string> = new Set<WeatherIconName>([
+    79→  'sun',
+    80→  'moon',
+    81→  'partly-cloudy-day',
+    82→  'partly-cloudy-night',
+    83→  'cloudy',
+    84→  'fog',
+    85→  'drizzle',
+    86→  'rain',
+    87→  'thunder',
+    88→  'snow',
+    89→  'wind',
+    90→  'hail',
+    91→]);
+    92→
+    93→/* ------------------------------------------------------------------ */
+    94→/* Visibility gating — ONE IntersectionObserver shared by every icon.  */
+    95→/* Leaving the viewport adds `.icon-paused` to the root <svg>.         */
+    96→/* Ancient browsers without IntersectionObserver simply never pause.  */
+    97→/* ------------------------------------------------------------------ */
+    98→
+    99→let iconVisibilityObserver: IntersectionObserver | null | undefined;
+   100→
+   101→function getIconVisibilityObserver(): IntersectionObserver | null {
+   102→  if (iconVisibilityObserver !== undefined) return iconVisibilityObserver;
+   103→  if (typeof window === 'undefined' || typeof IntersectionObserver === 'undefined') {
+   104→    iconVisibilityObserver = null;
+   105→    return null;
+   106→  }
+   107→  iconVisibilityObserver = new IntersectionObserver(
+   108→    (entries) => {
+   109→      for (const entry of entries) {
+   110→        entry.target.classList.toggle('icon-paused', !entry.isIntersecting);
+   111→      }
+   112→    },
+   113→    { rootMargin: '32px 0px' },
+   114→  );
+   115→  return iconVisibilityObserver;
+   116→}
+   117→
+   118→/* ------------------------------------------------------------------ */
+   119→/* Palette — on-brand teal / sage / amber (no default blue/indigo)     */
+   120→/* ------------------------------------------------------------------ */
+   121→
+   122→const PAL = {
+   123→  sunCore: ['#FFF6E8', '#FFE3AE', '#F0954A'],
+   124→  ray: '#FFD9A0',
+   125→  moon: ['#F7FBF9', '#C9E4DC'],
+   126→  crater: '#C4DBD3',
+   127→  cloudDay: ['#EEF6F2', '#D6E6E0', '#B9CFC9'],
+   128→  cloudNight: ['#D5E4E0', '#BCCFCB', '#9FB5B0'],
+   129→  cloudShadeDay: '#91A7A2',
+   130→  cloudShadeNight: '#7E938F',
+   131→  drop: ['#8FD4C6', '#4E9C8F'],
+   132→  bolt: ['#FFE08A', '#F0954A'],
+   133→  flake: ['#FDFEFE', '#D9EAE7'],
+   134→  fogBand: '#DFE9E5',
+   135→  hail: ['#FDFEFE', '#E8F4F1'],
+   136→} as const;
+   137→
+   138→const RAY_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
+   139→
+   140→/* ------------------------------------------------------------------ */
+   141→/* Weather glyph building blocks                                       */
+   142→/* ------------------------------------------------------------------ */
+   143→
+   144→/** Cloud silhouette — union of puffs + a flat-bottom bar. Rendered as
+   145→ *  one seamless fill because the gradient uses userSpaceOnUse coords. */
+   146→const CLOUD_PARTS = (
+   147→  <>
+   148→    <circle cx="21.5" cy="38.3" r="8.9" />
+   149→    <circle cx="32" cy="29" r="11.6" />
+   150→    <circle cx="42.8" cy="36.8" r="8.5" />
+   151→    <rect x="20.5" y="37" width="23.5" height="10.2" rx="5.1" />
+   152→  </>
+   153→);
+   154→
+   155→function CloudBody({ id, variant }: { id: string; variant: 'day' | 'night' }) {
+   156→  const stops = variant === 'day' ? PAL.cloudDay : PAL.cloudNight;
+   157→  const shade = variant === 'day' ? PAL.cloudShadeDay : PAL.cloudShadeNight;
+   158→  return (
+   159→    <>
+   160→      <defs>
+   161→        <linearGradient id={`${id}-cl`} gradientUnits="userSpaceOnUse" x1="32" y1="17" x2="32" y2="48">
+   162→          <stop offset="0" stopColor={stops[0]} />
+   163→          <stop offset="0.55" stopColor={stops[1]} />
+   164→          <stop offset="1" stopColor={stops[2]} />
+   165→        </linearGradient>
+   166→        <radialGradient id={`${id}-clh`} cx="0.5" cy="0.42" r="0.62">
+   167→          <stop offset="0" stopColor="#ffffff" stopOpacity="0.5" />
+   168→          <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+   169→        </radialGradient>
+   170→        <clipPath id={`${id}-cc`}>{CLOUD_PARTS}</clipPath>
+   171→      </defs>
+   172→      {/* main body */}
+   173→      <g fill={`url(#${id}-cl)`}>{CLOUD_PARTS}</g>
+   174→      {/* inner top-left highlight + darker underside, clipped to the body */}
+   175→      <g clipPath={`url(#${id}-cc)`}>
+   176→        <ellipse
+   177→          cx="28.5"
+   178→          cy="25"
+   179→          rx="13"
+   180→          ry="7"
+   181→          fill={`url(#${id}-clh)`}
+   182→          opacity="0.85"
+   183→          transform="rotate(-14 28.5 25)"
+   184→        />
+   185→        <ellipse cx="33" cy="46.5" rx="18" ry="5.2" fill={shade} opacity="0.32" />
+   186→      </g>
+   187→    </>
+   188→  );
+   189→}
+   190→
+   191→/** Soft radial ground shadow — the "sits in space" depth layer. */
+   192→function GroundShadow({
+   193→  id,
+   194→  cx = 32,
+   195→  cy = 53,
+   196→  rx = 16.5,
+   197→  ry = 3.4,
+   198→  opacity = 0.16,
+   199→}: {
+   200→  id: string;
+   201→  cx?: number;
+   202→  cy?: number;
+   203→  rx?: number;
+   204→  ry?: number;
+   205→  opacity?: number;
+   206→}) {
+   207→  return (
+   208→    <>
+   209→      <defs>
+   210→        <radialGradient id={`${id}-gs`} cx="0.5" cy="0.5" r="0.5">
+   211→          <stop offset="0" stopColor="#0A1B1E" stopOpacity={opacity} />
+   212→          <stop offset="1" stopColor="#0A1B1E" stopOpacity="0" />
+   213→        </radialGradient>
+   214→      </defs>
+   215→      <ellipse cx={cx} cy={cy} rx={rx} ry={ry} fill={`url(#${id}-gs)`} />
+   216→    </>
+   217→  );
+   218→}
+   219→
+   220→/** Candy sun — radial-lit core, rotating rays, warm aura. */
+   221→function SunGlyph({
+   222→  id,
+   223→  cx,
+   224→  cy,
+   225→  r,
+   226→  rays = true,
+   227→}: {
+   228→  id: string;
+   229→  cx: number;
+   230→  cy: number;
+   231→  r: number;
+   232→  rays?: boolean;
+   233→}) {
+   234→  const rIn = r * 1.5;
+   235→  const rOut = r * 2.1;
+   236→  return (
+   237→    <>
+   238→      <defs>
+   239→        <radialGradient id={`${id}-sc`} cx="0.36" cy="0.32" r="0.85">
+   240→          <stop offset="0" stopColor={PAL.sunCore[0]} />
+   241→          <stop offset="0.42" stopColor={PAL.sunCore[1]} />
+   242→          <stop offset="1" stopColor={PAL.sunCore[2]} />
+   243→        </radialGradient>
+   244→        <radialGradient id={`${id}-sg`} cx="0.5" cy="0.5" r="0.5">
+   245→          <stop offset="0" stopColor="#F0954A" stopOpacity="0.22" />
+   246→          <stop offset="0.72" stopColor="#F0954A" stopOpacity="0.08" />
+   247→          <stop offset="1" stopColor="#F0954A" stopOpacity="0" />
+   248→        </radialGradient>
+   249→        <radialGradient id={`${id}-sh`} cx="0.5" cy="0.38" r="0.62">
+   250→          <stop offset="0" stopColor="#ffffff" stopOpacity="0.65" />
+   251→          <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+   252→        </radialGradient>
+   253→      </defs>
+   254→      {/* warm aura */}
+   255→      <circle cx={cx} cy={cy} r={r * 2.5} fill={`url(#${id}-sg)`} />
+   256→      {rays && (
+   257→        <g className="ic-sun-rays" stroke={PAL.ray} strokeWidth={r * 0.3} strokeLinecap="round">
+   258→          {RAY_ANGLES.map((deg) => {
+   259→            const rad = (deg * Math.PI) / 180;
+   260→            const cos = Math.cos(rad);
+   261→            const sin = Math.sin(rad);
+   262→            return (
+   263→              <line
+   264→                key={deg}
+   265→                x1={cx + cos * rIn}
+   266→                y1={cy + sin * rIn}
+   267→                x2={cx + cos * rOut}
+   268→                y2={cy + sin * rOut}
+   269→              />
+   270→            );
+   271→          })}
+   272→        </g>
+   273→      )}
+   274→      <g className="ic-sun-core">
+   275→        <circle cx={cx} cy={cy} r={r} fill={`url(#${id}-sc)`} />
+   276→        <ellipse
+   277→          cx={cx - r * 0.3}
+   278→          cy={cy - r * 0.34}
+   279→          rx={r * 0.42}
+   280→          ry={r * 0.3}
+   281→          fill={`url(#${id}-sh)`}
+   282→          transform={`rotate(-18 ${cx - r * 0.3} ${cy - r * 0.34})`}
+   283→        />
+   284→      </g>
+   285→    </>
+   286→  );
+   287→}
+   288→
+   289→/** Crescent moon — masked cut for a fat Apple-style crescent, craters,
+   290→ *  soft glow, gentle float; optional twinkling companion stars. */
+   291→function MoonGlyph({
+   292→  id,
+   293→  cx,
+   294→  cy,
+   295→  r,
+   296→  stars = false,
+   297→}: {
+   298→  id: string;
+   299→  cx: number;
+   300→  cy: number;
+   301→  r: number;
+   302→  stars?: boolean;
+   303→}) {
+   304→  const cut = { x: cx + r * 0.6, y: cy - r * 0.52, r: r * 0.92 };
+   305→  return (
+   306→    <>
+   307→      <defs>
+   308→        <linearGradient
+   309→          id={`${id}-mg`}
+   310→          gradientUnits="userSpaceOnUse"
+   311→          x1={cx - r}
+   312→          y1={cy - r}
+   313→          x2={cx + r * 0.4}
+   314→          y2={cy + r}
+   315→        >
+   316→          <stop offset="0" stopColor={PAL.moon[0]} />
+   317→          <stop offset="1" stopColor={PAL.moon[1]} />
+   318→        </linearGradient>
+   319→        <radialGradient id={`${id}-mgl`} cx="0.5" cy="0.5" r="0.5">
+   320→          <stop offset="0" stopColor="#C9E4DC" stopOpacity="0.2" />
+   321→          <stop offset="1" stopColor="#C9E4DC" stopOpacity="0" />
+   322→        </radialGradient>
+   323→        <mask id={`${id}-mm`}>
+   324→          <rect x={cx - r - 2} y={cy - r - 2} width={r * 2 + 4} height={r * 2 + 4} fill="#ffffff" />
+   325→          <circle cx={cut.x} cy={cut.y} r={cut.r} fill="#000000" />
+   326→        </mask>
+   327→        <radialGradient id={`${id}-mh`} cx="0.5" cy="0.38" r="0.65">
+   328→          <stop offset="0" stopColor="#ffffff" stopOpacity="0.55" />
+   329→          <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+   330→        </radialGradient>
+   331→      </defs>
+   332→      {/* cool aura */}
+   333→      <circle cx={cx} cy={cy} r={r * 2.15} fill={`url(#${id}-mgl)`} />
+   334→      <g className="ic-moon-float">
+   335→        <g mask={`url(#${id}-mm)`}>
+   336→          <circle cx={cx} cy={cy} r={r} fill={`url(#${id}-mg)`} />
+   337→          <ellipse
+   338→            cx={cx - r * 0.42}
+   339→            cy={cy - r * 0.26}
+   340→            rx={r * 0.36}
+   341→            ry={r * 0.25}
+   342→            fill={`url(#${id}-mh)`}
+   343→            transform={`rotate(-20 ${cx - r * 0.42} ${cy - r * 0.26})`}
+   344→          />
+   345→          <g fill={PAL.crater}>
+   346→            <circle cx={cx - r * 0.4} cy={cy + r * 0.2} r={r * 0.115} opacity="0.5" />
+   347→            <circle cx={cx - r * 0.06} cy={cy + r * 0.54} r={r * 0.08} opacity="0.45" />
+   348→            <circle cx={cx - r * 0.52} cy={cy - r * 0.18} r={r * 0.07} opacity="0.4" />
+   349→          </g>
+   350→        </g>
+   351→      </g>
+   352→      {stars && (
+   353→        <g fill={PAL.moon[0]}>
+   354→          <circle className="ic-star-a" cx="50.5" cy="15.5" r="1.3" />
+   355→          <circle className="ic-star-b" cx="55" cy="24.5" r="0.85" />
+   356→        </g>
+   357→      )}
+   358→    </>
+   359→  );
+   360→}
+   361→
+   362→/* ------------------------------------------------------------------ */
+   363→/* Weather glyphs (composition)                                        */
+   364→/* ------------------------------------------------------------------ */
+   365→
+   366→function PartlyCloudyGlyph({ id, night }: { id: string; night: boolean }) {
+   367→  return (
+   368→    <>
+   369→      <GroundShadow id={id} cy={52} rx={15} />
+   370→      {night ? (
+   371→        /* small moon (~70%) peeking out up-right, floating */
+   372→        <g transform="translate(14 -9.5)">
+   373→          <MoonGlyph id={id} cx={30.5} cy={29} r={8.6} />
+   374→        </g>
+   375→      ) : (
+   376→        /* small sun (~70%) peeking out up-right */
+   377→        <SunGlyph id={id} cx={43} cy={21.5} r={8} />
+   378→      )}
+   379→      <g transform="translate(-0.5 3) scale(0.92)">
+   380→        <g className="ic-drift">
+   381→          <CloudBody id={id} variant={night ? 'night' : 'day'} />
+   382→        </g>
+   383→      </g>
+   384→    </>
+   385→  );
+   386→}
+   387→
+   388→function CloudyGlyph({ id }: { id: string }) {
+   389→  return (
+   390→    <>
+   391→      <GroundShadow id={id} cy={52.5} />
+   392→      {/* back layer — smaller, higher, drifting the other way */}
+   393→      <g transform="translate(21.5 -4.5) scale(0.58)">
+   394→        <g className="ic-drift-back">
+   395→          <CloudBody id={`${id}b`} variant="day" />
+   396→        </g>
+   397→      </g>
+   398→      {/* front layer */}
+   399→      <g transform="translate(-0.8 3.2) scale(0.97)">
+   400→        <g className="ic-drift-front">
+   401→          <CloudBody id={id} variant="day" />
+   402→        </g>
+   403→      </g>
+   404→    </>
+   405→  );
+   406→}
+   407→
+   408→function FogGlyph({ id }: { id: string }) {
+   409→  const bands = [
+   410→    { x: 18, w: 27, y: 42, h: 4.6, o: 0.95, cls: 'ic-fog-1' },
+   411→    { x: 23, w: 20, y: 48.5, h: 4.2, o: 0.8, cls: 'ic-fog-2' },
+   412→    { x: 20, w: 24, y: 54.5, h: 3.9, o: 0.65, cls: 'ic-fog-3' },
+   413→  ];
+   414→  return (
+   415→    <>
+   416→      <GroundShadow id={id} cy={61} rx={17} ry={2.6} opacity={0.1} />
+   417→      <g transform="translate(1 -7) scale(0.94)">
+   418→        <CloudBody id={id} variant="day" />
+   419→      </g>
+   420→      {bands.map((b) => (
+   421→        <rect
+   422→          key={b.cls}
+   423→          className={b.cls}
+   424→          x={b.x}
+   425→          y={b.y}
+   426→          width={b.w}
+   427→          height={b.h}
+   428→          rx={b.h / 2}
+   429→          fill={PAL.fogBand}
+   430→          opacity={b.o}
+   431→        />
+   432→      ))}
+   433→    </>
+   434→  );
+   435→}
+   436→
+   437→function RainGlyph({ id, kind }: { id: string; kind: 'rain' | 'drizzle' }) {
+   438→  const rain = kind === 'rain';
+   439→  const drops = rain
+   440→    ? [
+   441→        { x: 24.5, d: '' },
+   442→        { x: 32, d: 'ic-delay-2' },
+   443→        { x: 39.5, d: 'ic-delay-3' },
+   444→      ]
+   445→    : [
+   446→        { x: 21.5, d: '' },
+   447→        { x: 28.2, d: 'ic-delay-2' },
+   448→        { x: 34.9, d: 'ic-delay-3' },
+   449→        { x: 41.6, d: 'ic-delay-4' },
+   450→      ];
+   451→  const w = rain ? 3 : 2.2;
+   452→  const h = rain ? 8.5 : 6.5;
+   453→  const y = rain ? 42 : 43.5;
+   454→  const cls = rain ? 'ic-rain-drop' : 'ic-drizzle-drop';
+   455→  return (
+   456→    <>
+   457→      <GroundShadow id={id} cy={53} rx={15.5} />
+   458→      <defs>
+   459→        <linearGradient id={`${id}-rd`} x1="0" y1="0" x2="0" y2="1">
+   460→          <stop offset="0" stopColor={PAL.drop[0]} />
+   461→          <stop offset="1" stopColor={PAL.drop[1]} />
+   462→        </linearGradient>
+   463→      </defs>
+   464→      <g transform={rain ? 'translate(0 -4.5)' : 'translate(0 -3.5)'}>
+   465→        <CloudBody id={id} variant="day" />
+   466→      </g>
+   467→      {drops.map((drop) => (
+   468→        <rect
+   469→          key={drop.x}
+   470→          className={cn(cls, drop.d)}
+   471→          x={drop.x - w / 2}
+   472→          y={y}
+   473→          width={w}
+   474→          height={h}
+   475→          rx={w / 2}
+   476→          fill={`url(#${id}-rd)`}
+   477→        />
+   478→      ))}
+   479→    </>
+   480→  );
+   481→}
+   482→
+   483→const BOLT_D =
+   484→  'M33 39.5 L40 39.5 L35.6 47.4 L40 47.4 L28.2 59 L32.8 50 L28.6 50 Z';
+   485→
+   486→function ThunderGlyph({ id }: { id: string }) {
+   487→  return (
+   488→    <>
+   489→      <GroundShadow id={id} cy={53.5} rx={15.5} />
+   490→      <defs>
+   491→        <linearGradient id={`${id}-bo`} x1="0" y1="0" x2="0" y2="1">
+   492→          <stop offset="0" stopColor={PAL.bolt[0]} />
+   493→          <stop offset="1" stopColor={PAL.bolt[1]} />
+   494→        </linearGradient>
+   495→        <radialGradient id={`${id}-bog`} cx="0.5" cy="0.5" r="0.5">
+   496→          <stop offset="0" stopColor="#FFE08A" stopOpacity="0.55" />
+   497→          <stop offset="1" stopColor="#FFE08A" stopOpacity="0" />
+   498→        </radialGradient>
+   499→      </defs>
+   500→      <g transform="translate(0 -7) scale(0.98)">
+   501→        <g className="ic-cloud-shake">
+   502→          <CloudBody id={id} variant="day" />
+   503→        </g>
+   504→      </g>
+   505→      {/* flash glow + hot core, both synced with the cloud shake */}
+   506→      <ellipse className="ic-bolt-flash" cx="34.5" cy="48" rx="13" ry="11" fill={`url(#${id}-bog)`} />
+   507→      <path d={BOLT_D} fill={`url(#${id}-bo)`} opacity="0.95" />
+   508→      <path className="ic-bolt-flash" d={BOLT_D} fill="#FFF6E8" />
+   509→    </>
+   510→  );
+   511→}
+   512→
+   513→function SnowGlyph({ id }: { id: string }) {
+   514→  const flakes = [
+   515→    { x: 23.5, y: 47.5, d: '' },
+   516→    { x: 32.5, y: 50.5, d: 'ic-delay-2' },
+   517→    { x: 41.5, y: 47.5, d: 'ic-delay-3' },
+   518→  ];
+   519→  return (
+   520→    <>
+   521→      <GroundShadow id={id} cy={54} rx={15.5} />
+   522→      <defs>
+   523→        <linearGradient id={`${id}-fl`} x1="0" y1="0" x2="1" y2="1">
+   524→          <stop offset="0" stopColor={PAL.flake[0]} />
+   525→          <stop offset="1" stopColor={PAL.flake[1]} />
+   526→        </linearGradient>
+   527→      </defs>
+   528→      <g transform="translate(0 -4.5)">
+   529→        <CloudBody id={id} variant="day" />
+   530→      </g>
+   531→      {flakes.map((f) => (
+   532→        <g key={f.x} transform={`translate(${f.x} ${f.y})`}>
+   533→          <g className={cn('ic-flake', f.d)}>
+   534→            <path
+   535→              d="M-3.9 0H3.9M-1.95 -3.38L1.95 3.38M-1.95 3.38L1.95 -3.38"
+   536→              stroke={`url(#${id}-fl)`}
+   537→              strokeWidth="1.5"
+   538→              strokeLinecap="round"
+   539→            />
+   540→          </g>
+   541→        </g>
+   542→      ))}
+   543→    </>
+   544→  );
+   545→}
+   546→
+   547→const WIND_LINES = [
+   548→  { d: 'M16 26 H35 A6 6 0 1 0 29 20', w: 4, c: '#E9F2EF', o: 1, cls: '' },
+   549→  { d: 'M13 36 H41 A5 5 0 1 1 36 41', w: 4, c: '#DCE9E4', o: 0.9, cls: 'ic-delay-2' },
+   550→  { d: 'M18 48 H36 A4.5 4.5 0 1 0 31.5 43.5', w: 3.6, c: '#CFE0DA', o: 0.8, cls: 'ic-delay-3' },
+   551→];
+   552→
+   553→function WindGlyph() {
+   554→  return (
+   555→    <g fill="none" strokeLinecap="round">
+   556→      {WIND_LINES.map((l) => (
+   557→        <g key={l.d}>
+   558→          {/* faint constant underlay keeps the glyph legible between gusts */}
+   559→          <path d={l.d} stroke={l.c} strokeWidth={l.w} opacity={l.o * 0.28} />
+   560→          <path
+   561→            d={l.d}
+   562→            stroke={l.c}
+   563→            strokeWidth={l.w}
+   564→            opacity={l.o}
+   565→            pathLength={100}
+   566→            className={cn('ic-wind-sweep', l.cls)}
+   567→          />
+   568→        </g>
+   569→      ))}
+   570→    </g>
+   571→  );
+   572→}
+   573→
+   574→function HailGlyph({ id }: { id: string }) {
+   575→  const stones = [
+   576→    { x: 21.5, d: '' },
+   577→    { x: 28.8, d: 'ic-delay-2' },
+   578→    { x: 36.1, d: 'ic-delay-3' },
+   579→    { x: 43.4, d: 'ic-delay-4' },
+   580→  ];
+   581→  return (
+   582→    <>
+   583→      <GroundShadow id={id} cy={55} rx={15} />
+   584→      <defs>
+   585→        <radialGradient id={`${id}-ha`} cx="0.35" cy="0.3" r="0.85">
+   586→          <stop offset="0" stopColor={PAL.hail[0]} />
+   587→          <stop offset="1" stopColor={PAL.hail[1]} />
+   588→        </radialGradient>
+   589→      </defs>
+   590→      <g transform="translate(0 -5.5) scale(0.97)">
+   591→        <CloudBody id={id} variant="day" />
+   592→      </g>
+   593→      {stones.map((s) => (
+   594→        <circle
+   595→          key={s.x}
+   596→          className={cn('ic-hail', s.d)}
+   597→          cx={s.x}
+   598→          cy={45}
+   599→          r={2.4}
+   600→          fill={`url(#${id}-ha)`}
+   601→        />
+   602→      ))}
+   603→    </>
+   604→  );
+   605→}
+   606→
+   607→const WEATHER_GLYPHS: Record<WeatherIconName, (id: string) => ReactNode> = {
+   608→  sun: (id) => <SunGlyph id={id} cx={32} cy={32} r={11.5} />,
+   609→  moon: (id) => <MoonGlyph id={id} cx={32} cy={31.5} r={12.5} stars />,
+   610→  'partly-cloudy-day': (id) => <PartlyCloudyGlyph id={id} night={false} />,
+   611→  'partly-cloudy-night': (id) => <PartlyCloudyGlyph id={id} night />,
+   612→  cloudy: (id) => <CloudyGlyph id={id} />,
+   613→  fog: (id) => <FogGlyph id={id} />,
+   614→  drizzle: (id) => <RainGlyph id={id} kind="drizzle" />,
+   615→  rain: (id) => <RainGlyph id={id} kind="rain" />,
+   616→  thunder: (id) => <ThunderGlyph id={id} />,
+   617→  snow: (id) => <SnowGlyph id={id} />,
+   618→  wind: () => <WindGlyph />,
+   619→  hail: (id) => <HailGlyph id={id} />,
+   620→};
+   621→
+   622→/* ------------------------------------------------------------------ */
+   623→/* UI icons — 24×24, currentColor, round caps/joins                    */
+   624→/* ------------------------------------------------------------------ */
+   625→
+   626→const PIN_D = 'M12 21.5C9.8 19.7 4.8 15.6 4.8 10.1a7.2 7.2 0 0 1 14.4 0c0 5.5-5 9.6-7.2 11.4z';
+   627→const GEAR_D =
+   628→  'M19.17 13.62 L21.26 14.88 A9.7 9.7 0 0 1 20.59 16.51 L18.21 15.93 A7.35 7.35 0 0 1 15.93 18.21 L16.51 20.59 A9.7 9.7 0 0 1 14.88 21.26 L13.62 19.17 A7.35 7.35 0 0 1 10.38 19.17 L9.12 21.26 A9.7 9.7 0 0 1 7.49 20.59 L8.07 18.21 A7.35 7.35 0 0 1 5.79 15.93 L3.41 16.51 A9.7 9.7 0 0 1 2.74 14.88 L4.83 13.62 A7.35 7.35 0 0 1 4.83 10.38 L2.74 9.12 A9.7 9.7 0 0 1 3.41 7.49 L5.79 8.07 A7.35 7.35 0 0 1 8.07 5.79 L7.49 3.41 A9.7 9.7 0 0 1 9.12 2.74 L10.38 4.83 A7.35 7.35 0 0 1 13.62 4.83 L14.88 2.74 A9.7 9.7 0 0 1 16.51 3.41 L15.93 5.79 A7.35 7.35 0 0 1 18.21 8.07 L20.59 7.49 A9.7 9.7 0 0 1 21.26 9.12 L19.17 10.38 A7.35 7.35 0 0 1 19.17 13.62 Z';
+   629→const SPARKLE_D =
+   630→  'M12 2.8C12.5 7 14.5 9.3 19.2 12C14.5 14.7 12.5 17 12 21.2C11.5 17 9.5 14.7 4.8 12C9.5 9.3 11.5 7 12 2.8Z';
+   631→
+   632→function strokeProps(sw: number) {
+   633→  return {
+   634→    fill: 'none',
+   635→    stroke: 'currentColor',
+   636→    strokeWidth: sw,
+   637→    strokeLinecap: 'round' as const,
+   638→    strokeLinejoin: 'round' as const,
+   639→  };
+   640→}
+   641→
+   642→const UI_GLYPHS: Record<UiIconName, (args: { id: string; sw: number }) => ReactNode> = {
+   643→  search: ({ sw }) => (
+   644→    <g {...strokeProps(sw)}>
+   645→      <circle cx="11" cy="11" r="7" />
+   646→      <path d="M16.2 16.2 21 21" />
+   647→    </g>
+   648→  ),
+   649→  pin: ({ sw }) => (
+   650→    <g {...strokeProps(sw)}>
+   651→      <path className="ic-pin-ring" d={PIN_D} />
+   652→      <path d={PIN_D} />
+   653→      <circle cx="12" cy="10" r="2.6" />
+   654→    </g>
+   655→  ),
+   656→  gear: ({ sw }) => (
+   657→    <g {...strokeProps(sw)}>
+   658→      <path className="ic-gear" d={GEAR_D} />
+   659→      <circle cx="12" cy="12" r="3.1" />
+   660→    </g>
+   661→  ),
+   662→  plus: ({ sw }) => (
+   663→    <g {...strokeProps(sw)}>
+   664→      <path d="M12 5v14M5 12h14" />
+   665→    </g>
+   666→  ),
+   667→  check: ({ sw }) => (
+   668→    <g {...strokeProps(sw)}>
+   669→      <path className="ic-check-draw" pathLength={100} d="M5 12.5l4.5 4.5L19 7.5" />
+   670→    </g>
+   671→  ),
+   672→  x: ({ sw }) => (
+   673→    <g {...strokeProps(sw)}>
+   674→      <path d="M6 6l12 12M18 6 6 18" />
+   675→    </g>
+   676→  ),
+   677→  'chevron-up': ({ sw }) => (
+   678→    <g {...strokeProps(sw)}>
+   679→      <path d="M6 14.5l6-6 6 6" />
+   680→    </g>
+   681→  ),
+   682→  'chevron-down': ({ sw }) => (
+   683→    <g {...strokeProps(sw)}>
+   684→      <path d="M6 9.5l6 6 6-6" />
+   685→    </g>
+   686→  ),
+   687→  'chevron-left': ({ sw }) => (
+   688→    <g {...strokeProps(sw)}>
+   689→      <path d="M14.5 6l-6 6 6 6" />
+   690→    </g>
+   691→  ),
+   692→  'chevron-right': ({ sw }) => (
+   693→    <g {...strokeProps(sw)}>
+   694→      <path d="M9.5 6l6 6-6 6" />
+   695→    </g>
+   696→  ),
+   697→  sparkle: ({ id, sw }) => (
+   698→    <g>
+   699→      <defs>
+   700→        <clipPath id={`${id}-spc`}>
+   701→          <path d={SPARKLE_D} />
+   702→        </clipPath>
+   703→        <linearGradient id={`${id}-sph`} x1="0" y1="0" x2="1" y2="0">
+   704→          <stop offset="0" stopColor="#ffffff" stopOpacity="0" />
+   705→          <stop offset="0.5" stopColor="#ffffff" stopOpacity="0.55" />
+   706→          <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
+   707→        </linearGradient>
+   708→      </defs>
+   709→      <g className="ic-sparkle">
+   710→        <path
+   711→          d={SPARKLE_D}
+   712→          fill="currentColor"
+   713→          stroke="currentColor"
+   714→          strokeWidth={sw * 0.6}
+   715→          strokeLinejoin="round"
+   716→        />
+   717→        <rect
+   718→          className="ic-shimmer"
+   719→          x="-13"
+   720→          y="0"
+   721→          width="12"
+   722→          height="24"
+   723→          fill={`url(#${id}-sph)`}
+   724→          clipPath={`url(#${id}-spc)`}
+   725→        />
+   726→      </g>
+   727→    </g>
+   728→  ),
+   729→  droplet: ({ sw }) => (
+   730→    <g {...strokeProps(sw)}>
+   731→      <path d="M12 3.4C14.9 6.8 18 10.1 18 13.6A6 6 0 1 1 6 13.6C6 10.1 9.1 6.8 12 3.4Z" />
+   732→    </g>
+   733→  ),
+   734→  thermometer: ({ sw }) => (
+   735→    <g {...strokeProps(sw)}>
+   736→      <path d="M10 4a2 2 0 0 1 4 0v9.4a4.6 4.6 0 1 1-4 0Z" />
+   737→      <path d="M12 13.2v3.4" />
+   738→    </g>
+   739→  ),
+   740→  eye: ({ sw }) => (
+   741→    <g {...strokeProps(sw)}>
+   742→      <path d="M2.8 12C2.8 12 6.4 5.6 12 5.6C17.6 5.6 21.2 12 21.2 12C21.2 12 17.6 18.4 12 18.4C6.4 18.4 2.8 12 2.8 12Z" />
+   743→      <circle cx="12" cy="12" r="3" />
+   744→    </g>
+   745→  ),
+   746→  gauge: ({ sw }) => (
+   747→    <g {...strokeProps(sw)}>
+   748→      <path d="M5.2 18.6a8.6 8.6 0 1 1 13.6 0" />
+   749→      <path d="M12 16.9 9.1 10.3" />
+   750→      <circle cx="12" cy="17" r="1.5" fill="currentColor" stroke="none" />
+   751→    </g>
+   752→  ),
+   753→  sunrise: ({ sw }) => (
+   754→    <g {...strokeProps(sw)}>
+   755→      <path d="M4 18.6h16" />
+   756→      <path d="M7.8 18.6a4.2 4.2 0 0 1 8.4 0" />
+   757→      <path d="M12 9.8V4" />
+   758→      <path d="M9.4 6.4 12 3.8l2.6 2.6" />
+   759→      <path d="M5.3 12.7 3.7 11.1M18.7 12.7l1.6-1.6" />
+   760→    </g>
+   761→  ),
+   762→  sunset: ({ sw }) => (
+   763→    <g {...strokeProps(sw)}>
+   764→      <path d="M4 18.6h16" />
+   765→      <path d="M7.8 18.6a4.2 4.2 0 0 1 8.4 0" />
+   766→      <path d="M12 4v5.8" />
+   767→      <path d="M9.4 7.2 12 9.8l2.6-2.6" />
+   768→      <path d="M5.3 12.7 3.7 11.1M18.7 12.7l1.6-1.6" />
+   769→    </g>
+   770→  ),
+   771→  bookmark: ({ sw }) => (
+   772→    <g {...strokeProps(sw)}>
+   773→      <path d="M8 3.8h8a2 2 0 0 1 2 2v14.9l-6-4.1-6 4.1V5.8a2 2 0 0 1 2-2z" />
+   774→    </g>
+   775→  ),
+   776→  send: ({ sw }) => (
+   777→    <g {...strokeProps(sw)}>
+   778→      <path d="M21 3 10.8 13.2" />
+   779→      <path d="M21 3l-6.6 18-3.6-8.4L2.4 9z" />
+   780→    </g>
+   781→  ),
+   782→  stop: ({ sw }) => (
+   783→    <g {...strokeProps(sw)}>
+   784→      <rect x="5.4" y="5.4" width="13.2" height="13.2" rx="3.4" />
+   785→    </g>
+   786→  ),
+   787→  refresh: ({ sw }) => (
+   788→    <g className="ic-refresh" {...strokeProps(sw)}>
+   789→      <path d="M20.4 12a8.4 8.4 0 1 1-2.4-6.4" />
+   790→      <path d="M20.8 3.2v4.8H16" />
+   791→    </g>
+   792→  ),
+   793→  locate: ({ sw }) => (
+   794→    <g {...strokeProps(sw)}>
+   795→      <circle cx="12" cy="12" r="7" />
+   796→      <path d="M12 2.2v3.6M12 18.2v3.6M2.2 12h3.6M18.2 12h3.6" />
+   797→      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+   798→    </g>
+   799→  ),
+   800→  command: ({ sw }) => (
+   801→    <g {...strokeProps(sw)}>
+   802→      <path d="M15.2 6.2v11.4a2.9 2.9 0 1 0 2.9-2.9H5.9a2.9 2.9 0 1 0 2.9 2.9V6.2a2.9 2.9 0 1 0-2.9 2.9h12.2a2.9 2.9 0 1 0-2.9-2.9z" />
+   803→    </g>
+   804→  ),
+   805→  info: ({ sw }) => (
+   806→    <g {...strokeProps(sw)}>
+   807→      <circle cx="12" cy="12" r="8.8" />
+   808→      <path d="M12 11v5.2" />
+   809→      <path d="M12 7.6v.01" />
+   810→    </g>
+   811→  ),
+   812→  alert: ({ sw }) => (
+   813→    <g {...strokeProps(sw)}>
+   814→      <path d="M12 4.1 21 19.4a1.3 1.3 0 0 1-1.1 2H4.1a1.3 1.3 0 0 1-1.1-2L12 4.1z" />
+   815→      <path d="M12 10.2v4.4" />
+   816→      <path d="M12 17.6v.01" />
+   817→    </g>
+   818→  ),
+   819→  'moon-phase': ({ sw }) => (
+   820→    <g>
+   821→      {/* full-moon outline (the "shadow" disc) + lit crescent */}
+   822→      <circle cx="12" cy="12" r="8.6" fill="none" stroke="currentColor" strokeWidth={sw} opacity="0.45" />
+   823→      <path d="M14 3.6A8.6 8.6 0 0 0 14 20.4A8.6 8.6 0 0 1 14 3.6Z" fill="currentColor" />
+   824→    </g>
+   825→  ),
+   826→};
+   827→
+   828→/* ------------------------------------------------------------------ */
+   829→/* <Icon />                                                            */
+   830→/* ------------------------------------------------------------------ */
+   831→
+   832→export function Icon({ name, size = 24, animated = true, className, strokeWidth = 2 }: IconProps) {
+   833→  // useId → collision-free ids for gradients / masks / clipPaths
+   834→  // (10+ icons share the hourly strip page).
+   835→  const rawId = useId();
+   836→  const id = `a${rawId.replace(/[^a-zA-Z0-9]/g, '')}`;
+   837→  const rootRef = useRef<SVGSVGElement | null>(null);
+   838→  const isWeather = WEATHER_NAMES.has(name);
+   839→
+   840→  // Pause looping weather animations while off-screen (one shared observer).
+   841→  useEffect(() => {
+   842→    if (!isWeather || !animated) return;
+   843→    const el = rootRef.current;
+   844→    if (!el) return;
+   845→    const observer = getIconVisibilityObserver();
+   846→    if (!observer) return;
+   847→    observer.observe(el);
+   848→    return () => {
+   849→      observer.unobserve(el);
+   850→      el.classList.remove('icon-paused');
+   851→    };
+   852→  }, [isWeather, animated]);
+   853→
+   854→  return (
+   855→    <svg
+   856→      ref={rootRef}
+   857→      viewBox={isWeather ? '0 0 64 64' : '0 0 24 24'}
+   858→      width={size}
+   859→      height={size}
+   860→      aria-hidden="true"
+   861→      focusable="false"
+   862→      className={cn('shrink-0', animated && 'ic-anim', !isWeather && 'ui-icon', className)}
+   863→    >
+   864→      {isWeather
+   865→        ? WEATHER_GLYPHS[name as WeatherIconName](id)
+   866→        : UI_GLYPHS[name as UiIconName]({ id, sw: strokeWidth })}
+   867→    </svg>
+   868→  );
+   869→}
+   870→

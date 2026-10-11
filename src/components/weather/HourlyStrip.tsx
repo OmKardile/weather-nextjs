@@ -12,13 +12,13 @@ interface HourlyStripProps {
 }
 
 /**
- * Horizontally scrollable 24-hour strip with snap points.
+ * Horizontally scrollable 48-hour strip with snap points.
  */
 export function HourlyStrip({ hours, units }: HourlyStripProps) {
   return (
     <div
       role="list"
-      aria-label="Hourly forecast for the next 24 hours"
+      aria-label="Hourly forecast for the next 48 hours"
       className="scroll-slim -mx-1 flex snap-x snap-mandatory gap-2 overflow-x-auto px-1 pb-2"
     >
       {hours.map((hour, index) => {

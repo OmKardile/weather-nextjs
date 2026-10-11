@@ -1,0 +1,421 @@
+/* ==================================================================
+ * Aether — unified icon system animations (src/components/icons/Icon.tsx)
+ *
+ * Every animation rule is gated on `.ic-anim`, a class the root <svg>
+ * only carries when <Icon animated /> (default). animated={false} and
+ * prefers-reduced-motion therefore yield fully static glyphs.
+ * Off-screen roots receive `.icon-paused` from the single shared
+ * IntersectionObserver inside Icon.tsx.
+ * Only transform / opacity / stroke-dashoffset animate (~60fps safe).
+ * ================================================================== */
+
+/* --- off-screen gating (shared IntersectionObserver) --- */
+.icon-paused,
+.icon-paused * {
+  animation-play-state: paused !important;
+}
+
+/* ==================== weather glyphs ==================== */
+
+/* sun — rays slow-orbit, core breathes */
+.ic-sun-rays {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes ic-sun-rays {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes ic-sun-core {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+.ic-anim .ic-sun-rays {
+  animation: ic-sun-rays 48s linear infinite;
+}
+.ic-anim .ic-sun-core {
+  animation: ic-sun-core 4s ease-in-out infinite;
+}
+
+/* moon — gentle float + twinkling companion stars */
+@keyframes ic-moon-float {
+  0%,
+  100% {
+    transform: translateY(-1.5px);
+  }
+  50% {
+    transform: translateY(1.5px);
+  }
+}
+@keyframes ic-twinkle {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.ic-anim .ic-moon-float {
+  animation: ic-moon-float 8s ease-in-out infinite;
+}
+.ic-anim .ic-star-a {
+  animation: ic-twinkle 2.6s ease-in-out infinite;
+}
+.ic-anim .ic-star-b {
+  animation: ic-twinkle 3.4s ease-in-out infinite 0.9s;
+}
+
+/* clouds — drift (partly cloudy) and parallax (cloudy, opposite phases) */
+@keyframes ic-drift {
+  0%,
+  100% {
+    transform: translateX(-2.5px);
+  }
+  50% {
+    transform: translateX(2.5px);
+  }
+}
+@keyframes ic-drift-xl {
+  0%,
+  100% {
+    transform: translateX(-3px);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+}
+.ic-anim .ic-drift {
+  animation: ic-drift 7s ease-in-out infinite;
+}
+.ic-anim .ic-drift-front {
+  animation: ic-drift-xl 9.5s ease-in-out infinite;
+}
+.ic-anim .ic-drift-back {
+  animation: ic-drift-xl 7s ease-in-out infinite reverse;
+}
+
+/* rain / drizzle — staggered falling drops */
+@keyframes ic-rain-fall {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  16% {
+    opacity: 1;
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(14px);
+    opacity: 0;
+  }
+}
+@keyframes ic-drizzle-fall {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  24% {
+    opacity: 0.95;
+  }
+  78% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateY(9.5px);
+    opacity: 0;
+  }
+}
+.ic-anim .ic-rain-drop {
+  animation: ic-rain-fall 1.3s linear infinite;
+}
+.ic-anim .ic-rain-drop.ic-delay-2 {
+  animation-delay: 0.45s;
+}
+.ic-anim .ic-rain-drop.ic-delay-3 {
+  animation-delay: 0.9s;
+}
+.ic-anim .ic-drizzle-drop {
+  animation: ic-drizzle-fall 0.95s linear infinite;
+}
+.ic-anim .ic-drizzle-drop.ic-delay-2 {
+  animation-delay: 0.24s;
+}
+.ic-anim .ic-drizzle-drop.ic-delay-3 {
+  animation-delay: 0.48s;
+}
+.ic-anim .ic-drizzle-drop.ic-delay-4 {
+  animation-delay: 0.72s;
+}
+
+/* thunder — flash cycle every 3.2s + cloud shake synced to the flash window */
+@keyframes ic-bolt-flash {
+  0%,
+  3% {
+    opacity: 0;
+  }
+  6% {
+    opacity: 1;
+  }
+  9% {
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.65;
+  }
+  16%,
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes ic-cloud-shake {
+  0%,
+  3%,
+  18%,
+  100% {
+    transform: translateX(0);
+  }
+  5% {
+    transform: translateX(-1px);
+  }
+  7% {
+    transform: translateX(1px);
+  }
+  9% {
+    transform: translateX(-0.7px);
+  }
+  11% {
+    transform: translateX(0.7px);
+  }
+  13% {
+    transform: translateX(-0.3px);
+  }
+  15% {
+    transform: translateX(0);
+  }
+}
+.ic-anim .ic-bolt-flash {
+  animation: ic-bolt-flash 3.2s linear infinite;
+}
+.ic-anim .ic-cloud-shake {
+  animation: ic-cloud-shake 3.2s linear infinite;
+}
+
+/* snow — independent fall + tumble */
+.ic-flake {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes ic-flake-fall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  14% {
+    opacity: 1;
+  }
+  82% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(12px) rotate(180deg);
+    opacity: 0;
+  }
+}
+.ic-anim .ic-flake {
+  animation: ic-flake-fall 3.2s linear infinite;
+}
+.ic-anim .ic-flake.ic-delay-2 {
+  animation-delay: 1.05s;
+}
+.ic-anim .ic-flake.ic-delay-3 {
+  animation-delay: 2.1s;
+}
+
+/* fog — rounded bands drifting left/right */
+@keyframes ic-fog {
+  0%,
+  100% {
+    transform: translateX(-3px);
+  }
+  50% {
+    transform: translateX(3px);
+  }
+}
+.ic-anim .ic-fog-1 {
+  animation: ic-fog 6s ease-in-out infinite;
+}
+.ic-anim .ic-fog-2 {
+  animation: ic-fog 7.5s ease-in-out infinite reverse;
+}
+.ic-anim .ic-fog-3 {
+  animation: ic-fog 9s ease-in-out infinite;
+}
+
+/* wind — gusts travelling along the flow lines */
+@keyframes ic-wind-flow {
+  from {
+    stroke-dashoffset: 200;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.ic-anim .ic-wind-sweep {
+  stroke-dasharray: 62 138;
+  animation: ic-wind-flow 2.2s linear infinite;
+}
+.ic-anim .ic-wind-sweep.ic-delay-2 {
+  animation-delay: 0.35s;
+}
+.ic-anim .ic-wind-sweep.ic-delay-3 {
+  animation-delay: 0.7s;
+}
+
+/* hail — fast fall with a tiny settle bounce */
+@keyframes ic-hail-fall {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  55% {
+    transform: translateY(13px);
+  }
+  68% {
+    transform: translateY(11.6px);
+  }
+  80% {
+    transform: translateY(13px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(13px);
+    opacity: 0;
+  }
+}
+.ic-anim .ic-hail {
+  animation: ic-hail-fall 1.15s cubic-bezier(0.3, 0.7, 0.4, 1) infinite;
+}
+.ic-anim .ic-hail.ic-delay-2 {
+  animation-delay: 0.29s;
+}
+.ic-anim .ic-hail.ic-delay-3 {
+  animation-delay: 0.58s;
+}
+.ic-anim .ic-hail.ic-delay-4 {
+  animation-delay: 0.87s;
+}
+
+/* ==================== UI icons ==================== */
+
+/* check — draws itself on mount */
+@keyframes ic-check-draw {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.ic-anim .ic-check-draw {
+  stroke-dasharray: 100;
+  animation: ic-check-draw 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* gear — 24° nudge on icon hover or when caller adds .ui-gear-turn */
+.ic-gear {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.ic-anim.ui-icon:hover .ic-gear,
+.ic-anim.ui-gear-turn .ic-gear {
+  transform: rotate(24deg);
+}
+
+/* pin — soft pulse ring when caller adds .ui-pulse */
+.ic-pin-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  opacity: 0;
+}
+@keyframes ic-pin-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  75%,
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+.ic-anim.ui-pulse .ic-pin-ring {
+  animation: ic-pin-ring 2s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+/* refresh — slow continuous spin only with .ui-refresh-spin or on hover */
+.ic-refresh {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes ic-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.ic-anim.ui-refresh-spin .ic-refresh,
+.ic-anim.ui-icon:hover .ic-refresh {
+  animation: ic-spin 3.6s linear infinite;
+}
+
+/* sparkle — gentle breathe + sheen sweep */
+.ic-sparkle {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@keyframes ic-sparkle {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+@keyframes ic-shimmer {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(38px);
+  }
+}
+.ic-anim .ic-sparkle {
+  animation: ic-sparkle 2.8s ease-in-out infinite;
+}
+.ic-anim .ic-shimmer {
+  animation: ic-shimmer 2.8s linear infinite;
+}
+
+/* ==================== reduced motion ==================== */
+@media (prefers-reduced-motion: reduce) {
+  .ic-anim,
+  .ic-anim *,
+  .icon-paused,
+  .icon-paused * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
