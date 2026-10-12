@@ -5,6 +5,55 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.3.0] — 2026-10-12
+
+Trust & delight round: Aether starts keeping score of itself. The new
+**Forecast log** records each day's forecast high/low on first view and
+grades it against the measured sky the next day — plus a Daylight
+solstice tracker, a living tab (favicon + title), and an honest chart
+for dry nowcasts.
+
+### Added
+- **Forecast log (self-scoring ledger)** — a new "Forecast log" card
+  section. On the first successful fetch of a local calendar day, the
+  forecast high/low shown is recorded (the "morning call", own
+  `aether-ledger` localStorage store, observable + `useSyncExternalStore`
+  pattern like the badge store: validated on read, capped at 30 records
+  per city / 8 cities, all-°C internally). When the measured yesterday
+  arrives upstream (`past_days=1`), the matching record is scored. The
+  card shows a rolling verdict ("Sharp calls — 86% within 2°"), a
+  last-7-scored-days error-bar strip (teal ≤1°, amber ≤2.5°, orange
+  beyond; per-bar tooltips + full screen-reader summary), stat tiles
+  (avg miss / days scored / clean days) and a warm empty state with
+  today's pending call. Records °C, displays in the active units.
+  The section is reorder/hide-aware like every other card, has a ⌘K
+  "Jump to" entry, and its persisted order is auto-appended for
+  existing users.
+- **Truth seeker badge** — ninth achievement, unlocked when the ledger
+  scores its fifth day (impulsive `ledger-scored` signal, toast + the
+  Settings badge shelf).
+- **Daylight tracker card** — new card in "Sky & photography": a
+  semicircle solstice gauge (gradient arc with a marker dot + sun glyph)
+  showing today's daylight between the year's shortest and longest day
+  at this latitude (Cooper declination approximation), a signed
+  **+1m 24s/day** delta chip computed from tomorrow's bundle row,
+  sunrise / sunset / night stat pills, and a "minutes of daylight still
+  to gain/lose before the solstice" caption.
+- **Living tab** (`use-dynamic-favicon.ts`) — the browser tab becomes a
+  thermometer: a 64 px canvas favicon (rounded square, vertical gradient
+  sampled from the live scene engine, bold white temperature with
+  auto-sized glyphs) plus the document title ("20° Clear · Tokyo —
+  Aether"). Redrawn only on real changes (temperature / condition /
+  phase / city / units). A MutationObserver keeps the live title
+  authoritative — React can re-commit the static metadata `<title>`
+  when late streamed Suspense boundaries resolve.
+
+### Changed
+- **Dry nowcasts show their evidence** — "Dry for the next 2 hours" no
+  longer renders a bare header: a compact chance-of-precipitation
+  sparkline (gradient area + line, peak marker with "peak 2%" caption,
+  Now→+2h labels) now backs the claim. The wet chart is unchanged.
+
 ## [3.2.0] — 2026-10-12
 
 QA-driven round: a persisted-city robustness crash fixed, two data

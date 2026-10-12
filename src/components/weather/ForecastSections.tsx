@@ -24,6 +24,7 @@ import { AirQualityCard } from '@/components/weather/AirQualityCard';
 import { AdvisorCards } from '@/components/ai/AdvisorCards';
 import { DailyForecast } from '@/components/weather/DailyForecast';
 import { ForecastConfidence } from '@/components/weather/ForecastConfidence';
+import { ForecastLedgerCard } from '@/components/weather/ForecastLedgerCard';
 import { FreshnessPill } from '@/components/weather/FreshnessPill';
 import { HourlyStrip } from '@/components/weather/HourlyStrip';
 import { Icon } from '@/components/icons/Icon';
@@ -32,6 +33,7 @@ import { ModelCompare } from '@/components/weather/ModelCompare';
 import { MoonPhaseCard } from '@/components/weather/MoonPhaseCard';
 import { NextHourCard } from '@/components/weather/NextHourCard';
 import { AuroraCard } from '@/components/weather/sky/AuroraCard';
+import { DaylightCard } from '@/components/weather/sky/DaylightCard';
 import { SkyCard } from '@/components/weather/sky/SkyCard';
 import { TimeMachineCard } from '@/components/weather/sky/TimeMachineCard';
 import { TemperatureChart } from '@/components/weather/TemperatureChart';
@@ -375,19 +377,26 @@ export function ForecastSections({ city, bundle, units }: ForecastSectionsProps)
               </div>
             </div>
           );
+        case 'ledger':
+          return <ForecastLedgerCard city={city} bundle={bundle} units={units} />;
         case 'sky':
           return (
-            // grid-cols-1 base (not just lg:grid-cols-5): below lg an implicit
-            // auto track would size to the moon strip's max-content and blow
-            // past the viewport; an fr track lets the strip scroll inside.
-            <div className="fs-grid grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-5">
-              <div className="min-w-0 lg:col-span-3">
-                <SkyCard bundle={bundle} units={units} />
+            <>
+              {/* grid-cols-1 base (not just lg:grid-cols-5): below lg an implicit
+                  auto track would size to the moon strip's max-content and blow
+                  past the viewport; an fr track lets the strip scroll inside. */}
+              <div className="fs-grid grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-5">
+                <div className="min-w-0 lg:col-span-3">
+                  <SkyCard bundle={bundle} units={units} />
+                </div>
+                <div className="min-w-0 lg:col-span-2">
+                  <AuroraCard city={city} bundle={bundle} units={units} />
+                </div>
               </div>
-              <div className="min-w-0 lg:col-span-2">
-                <AuroraCard city={city} bundle={bundle} units={units} />
+              <div className="fs-stack mt-5">
+                <DaylightCard city={city} bundle={bundle} units={units} />
               </div>
-            </div>
+            </>
           );
         case 'details':
           return (

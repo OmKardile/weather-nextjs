@@ -58,6 +58,12 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     description: 'Shared an Aether weather card.',
     icon: 'send',
   },
+  {
+    id: 'truth-seeker',
+    title: 'Truth seeker',
+    description: 'Scored five days of Aether forecasts against the measured sky.',
+    icon: 'check',
+  },
 ] as const;
 
 export interface AchievementState {

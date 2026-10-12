@@ -48,11 +48,12 @@ interface CommandPaletteProps {
 const JUMP_TARGETS: Array<{
   id: string;
   label: string;
-  icon: 'clock' | 'calendar' | 'droplet' | 'gauge' | 'sparkle' | 'sky' | 'time';
+  icon: 'clock' | 'calendar' | 'droplet' | 'gauge' | 'sparkle' | 'sky' | 'time' | 'ledger';
 }> = [
   { id: 'hourly', label: 'Hourly forecast', icon: 'clock' },
   { id: 'daily', label: '7-day forecast', icon: 'calendar' },
   { id: 'air', label: 'Air quality', icon: 'droplet' },
+  { id: 'ledger', label: 'Forecast log', icon: 'ledger' },
   { id: 'sky', label: 'Sky & photography', icon: 'sky' },
   { id: 'details', label: 'Weather details', icon: 'gauge' },
   { id: 'timemachine', label: 'Time machine', icon: 'time' },
@@ -67,6 +68,7 @@ const ICON_NAMES = {
   sparkle: 'sparkle',
   sky: 'moon-phase',
   time: 'sunset',
+  ledger: 'check',
 } as const;
 
 export function CommandPalette(props: CommandPaletteProps) {

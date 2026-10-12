@@ -32,14 +32,18 @@ Aether is a ground-up rebuild of [OmKardile/weather-nextjs](https://github.com/O
 - Current conditions with a live location-local clock, feels-like, today's hi/lo, and a **“+2° vs yesterday” chip** (today's forecast high vs yesterday's measured high — trend icon, color-coded direction)
 - 48-hour hourly strip (hourly wind speed included) plus a hand-rolled interactive SVG temperature chart (hover/touch scrub, keyboard-navigable, precipitation-probability bars)
 - 7-day forecast with week-normalized temperature range bars
+- **Forecast log — Aether scores itself**: each day's forecast high/low is recorded on first view and graded against the measured sky the next day; the card shows a rolling accuracy verdict, a last-7-days error-bar strip, and avg-miss / days-scored / clean-days tiles (own localStorage ledger, validated + capped)
 - Full metric grid: wind speed + 16-point compass direction, humidity + dew point, UV index with scale marker, visibility, pressure, cloud cover, precipitation chance, and a sun-arc with live daylight progress
 - Moon phase card — phase name, illumination % and a full-moon countdown (zero-dependency calculation)
+- **Daylight tracker** — a semicircle solstice gauge placing today's daylight between the year's shortest and longest day at this latitude, a signed +Xm/day daylight-delta chip, sunrise / sunset / night pills, and the time to the next solstice
 - European Air Quality Index (EAQI) with pollutant breakdown (PM2.5 / PM10 / O₃ / NO₂), dominant pollutant, and a **24-hour AQI trend sparkline** (band-colored line, peak marker with time, screen-reader summary)
 
 **UX niceties**
 - Geolocation with graceful fallback (permission denied → friendly toast, not a dead end)
 - Saved cities (up to 8) with live temperatures, persisted to `localStorage`, plus last-visited-city restore
+- **Living tab** — the browser tab is a thermometer: a canvas favicon (scene-gradient backdrop + live temperature) and a live document title ("20° Clear · Tokyo — Aether"), redrawn only on real changes
 - Unit toggles: °C/°F + km/h/mph (and 24 h/12 h time) — instant, no refetch
+- **Achievements** — nine unlockable badges (storm chaser, night owl, cartographer, stargazer, sharer, truth seeker …) with toasts and a Settings shelf; everything is local-only
 
 **PWA** — installable, with an offline shell service worker (precached shell, network-first navigations, cache-first statics; API calls always live).
 

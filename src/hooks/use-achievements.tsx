@@ -109,6 +109,7 @@ export function useAchievementObserver({
       const kind = (event as CustomEvent<{ kind?: string }>).detail?.kind;
       if (kind === 'sky-night') tryUnlock('stargazer');
       if (kind === 'share-card') tryUnlock('sharer');
+      if (kind === 'ledger-scored') tryUnlock('truth-seeker');
     };
     window.addEventListener('aether:achievement', onSignal);
     return () => window.removeEventListener('aether:achievement', onSignal);

@@ -26,6 +26,7 @@ interface NextHourCardProps {
 }
 
 const CHART_H = 108;
+const DRY_H = 64;
 const BASELINE = 90;
 const BAR_MAX = 56;
 const PROB_TOP = 12;
@@ -129,7 +130,7 @@ export function NextHourCard({ minutely, units }: NextHourCardProps) {
         <div ref={wrapRef} className="mt-2">
           {safeGeom ? (
             <>
-          <svg
+        <svg
             width={width}
             height={CHART_H}
             className="block"
@@ -237,7 +238,93 @@ export function NextHourCard({ minutely, units }: NextHourCardProps) {
             <div className="skeleton h-[108px] w-full" aria-hidden="true" />
           )}
         </div>
-      ) : null}
+      ) : safeGeom ? (
+        /* Dry state still shows the chance-of-precipitation curve — a low,  */
+        /* honest sparkline so the "dry" call carries its own evidence.    */
+        <div ref={wrapRef} className="mt-2">
+          <svg
+            width={width}
+            height={DRY_H}
+            className="block"
+            role="img"
+            aria-label={`Chance of precipitation over the next 2 hours. ${headline}. Peak chance ${maxProb}%.`}
+          >
+            <defs>
+              <linearGradient id="aether-dry-area" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={AURORA_400} stopOpacity="0.25" />
+                <stop offset="100%" stopColor={AURORA_400} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+
+            {/* scaled dry geometry: half-height probability band */}
+            {(() => {
+              const scale = (DRY_H - 22) / (PROB_TOP + PROB_SPAN);
+              const dryPts = safeGeom.probPts.map((p) => ({
+                x: p.x,
+                y: DRY_H - 18 - (p.y - PROB_TOP) * scale * 0.62,
+              }));
+              const dryLine = dryPts
+                .map((p, i) => `${i === 0 ? 'M' : 'L'} ${f(p.x)} ${f(p.y)}`)
+                .join(' ');
+              const peak = dryPts.reduce((a, b) => (b.y < a.y ? b : a), dryPts[0]);
+              const area =
+                `${dryLine} L ${f(dryPts[dryPts.length - 1].x)} ${DRY_H - 14}` +
+                ` L ${f(dryPts[0].x)} ${DRY_H - 14} Z`;
+              return (
+                <>
+                  <path d={area} fill="url(#aether-dry-area)" />
+                  <path
+                    d={dryLine}
+                    fill="none"
+                    stroke={AURORA_400}
+                    strokeWidth={1.6}
+                    strokeLinecap="round"
+                    opacity={0.7}
+                  />
+                  <circle cx={f(peak.x)} cy={f(peak.y)} r={3} fill={AURORA_400} />
+                  <text
+                    x={clamp(peak.x, 26, width - 26)}
+                    y={Math.max(11, peak.y - 7)}
+                    textAnchor="middle"
+                    fontSize={10}
+                    className="tnum"
+                    style={{ fill: 'var(--surface-muted)' }}
+                  >
+                    peak {maxProb}%
+                  </text>
+                  <line
+                    x1={2}
+                    x2={width - 2}
+                    y1={DRY_H - 14}
+                    y2={DRY_H - 14}
+                    stroke="var(--surface-border)"
+                    strokeWidth={1}
+                  />
+                  {points.map((p, i) =>
+                    i % 2 === 0 ? (
+                      <text
+                        key={p.time}
+                        x={clamp(safeGeom.xs[i], 18, width - 18)}
+                        y={DRY_H - 3}
+                        textAnchor="middle"
+                        fontSize={10}
+                        className="tnum"
+                        style={{ fill: 'var(--surface-faint)' }}
+                      >
+                        {i === 0 ? 'Now' : minuteLabel(p.time, units)}
+                      </text>
+                    ) : null,
+                  )}
+                </>
+              );
+            })()}
+          </svg>
+        </div>
+      ) : (
+        <div ref={wrapRef}>
+          <div className="skeleton h-[64px] w-full" aria-hidden="true" />
+        </div>
+      )}
     </div>
   );
 }

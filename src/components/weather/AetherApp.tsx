@@ -9,6 +9,7 @@ import { usePreferences } from '@/hooks/use-preferences';
 import { useWeather } from '@/hooks/use-weather';
 import { useAmbientSound } from '@/hooks/use-ambient-sound';
 import { useAchievementObserver } from '@/hooks/use-achievements';
+import { useDynamicFavicon } from '@/hooks/use-dynamic-favicon';
 import { useEditMode } from '@/hooks/use-edit-mode';
 import { loadCachedBundle } from '@/lib/sections';
 import { getScene } from '@/lib/scenes';
@@ -218,6 +219,10 @@ export function AetherApp() {
     savedCount: savedCities.length,
     mapOpen,
   });
+
+  // The tab is a thermometer: canvas favicon (scene-gradient backdrop +
+  // temperature) and a live document title.
+  useDynamicFavicon({ bundle, city: activeCity, units });
 
   // Keep the page background in sync with the scene (overscroll areas).
   useEffect(() => {
