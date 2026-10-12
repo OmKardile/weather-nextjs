@@ -48,6 +48,8 @@ interface ObserverInputs {
   mapOpen: boolean;
   /** Id of the city whose weather is on screen (null on the welcome state). */
   cityId: number | null;
+  /** European AQI of the displayed city (null when air data is missing). */
+  aqi: number | null;
 }
 
 export function useAchievementObserver({
@@ -55,6 +57,7 @@ export function useAchievementObserver({
   savedCount,
   mapOpen,
   cityId,
+  aqi,
 }: ObserverInputs): void {
   // Hydrate from localStorage exactly once, after mount.
   useEffect(() => {
@@ -96,6 +99,12 @@ export function useAchievementObserver({
   useEffect(() => {
     if (mapOpen) tryUnlock('cartographer');
   }, [mapOpen, tryUnlock]);
+
+  // fresh-air: the displayed city's air is genuinely clean (European AQI
+  // ≤ 20 — the "good" band floor; 0 is a real reading, not missing data).
+  useEffect(() => {
+    if (aqi != null && aqi >= 0 && aqi <= 20) tryUnlock('fresh-air');
+  }, [aqi, tryUnlock]);
 
   // night-owl: local clock between 2 and 4 am (checked at mount + hourly).
   useEffect(() => {

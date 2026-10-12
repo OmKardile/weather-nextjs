@@ -76,6 +76,12 @@ export const ACHIEVEMENTS: readonly AchievementDef[] = [
     description: 'Checked the weather in ten different cities.',
     icon: 'compare',
   },
+  {
+    id: 'fresh-air',
+    title: 'Fresh air',
+    description: 'Looked up the air on a genuinely clean day (AQI 20 or better).',
+    icon: 'leaf',
+  },
 ] as const;
 
 export interface AchievementState {

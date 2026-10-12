@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { CSSProperties, JSX } from 'react';
 import { addMinutes, format, parseISO } from 'date-fns';
 import { Icon } from '@/components/icons/Icon';
@@ -13,6 +13,7 @@ import {
 } from '@/components/weather/chart-helpers';
 import { usePreferences } from '@/hooks/use-preferences';
 import type { SkinType } from '@/hooks/use-preferences';
+import { useToast } from '@/hooks/use-toast';
 import { uvInfo } from '@/lib/units';
 import type { Units, WeatherBundle } from '@/types/weather';
 
@@ -107,6 +108,7 @@ export function SunSafetyCard({ bundle, units }: SunSafetyCardProps): JSX.Elemen
   const motionOk = useMotionOk();
   const skinType = usePreferences((state) => state.skinType);
   const setSkinType = usePreferences((state) => state.setSkinType);
+  const { toast } = useToast();
 
   const hours = bundle.hourly;
   const uvNow = hours[0]?.uvIndex ?? 0;

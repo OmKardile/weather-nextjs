@@ -37,6 +37,11 @@ export function MobileDock({ active, onChange, className }: MobileDockProps) {
       aria-label="App sections"
       className={cn('pointer-events-none fixed inset-x-0 bottom-0 z-40 lg:hidden', className)}
     >
+      {/* Content scrim — lives between the drawer/map content (z-30) and
+          this dock (z-40) so scrolled content never fights the tab labels
+          at Ultra-clear glass settings (iOS tab-bar behavior; tones match
+          the .dock-scrim sky treatment in glass.css). */}
+      <div className="dock-content-scrim absolute inset-x-0 bottom-0" aria-hidden="true" />
       <div
         className="pointer-events-auto mx-auto mb-[max(12px,env(safe-area-inset-bottom))] w-fit px-3"
       >

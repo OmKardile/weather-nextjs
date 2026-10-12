@@ -219,6 +219,7 @@ export function AetherApp() {
     savedCount: savedCities.length,
     mapOpen,
     cityId: activeCity?.id ?? null,
+    aqi: bundle?.airQuality?.europeanAqi ?? null,
   });
 
   // The tab is a thermometer: canvas favicon (scene-gradient backdrop +

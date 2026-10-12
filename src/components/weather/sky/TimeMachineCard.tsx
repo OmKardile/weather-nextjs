@@ -166,6 +166,35 @@ function HistoricalChart({
     return { padX, slot, xOf, xOfYear, yOf, lo, hi };
   }, [years, normal, width]);
 
+  /* Trend geometry — regression ± 1σ band, clamped into the plot area.
+     Lives ABOVE the early return so hook order is stable every render. */
+  const trendGeom = useMemo(() => {
+    if (!trend || !geom) return null;
+    const fitY = (year: number) => trend.intercept + trend.slopePerYear * year;
+    const clampY = (y: number) =>
+      Math.min(height - CHART_BOTTOM, Math.max(CHART_TOP, y));
+    const yearsWithTmax = years.filter((y) => y.tmax != null);
+    if (yearsWithTmax.length === 0) return null;
+    const y0 = yearsWithTmax[0].year;
+    const y1 = yearsWithTmax[yearsWithTmax.length - 1].year;
+    const upper: string[] = [];
+    const lower: string[] = [];
+    for (let yr = y0; yr <= y1; yr += 1) {
+      const x = geom.xOfYear(yr);
+      upper.push(`${x},${f(clampY(geom.yOf(fitY(yr) + trend.sigma)))}`);
+      lower.push(`${x},${f(clampY(geom.yOf(fitY(yr) - trend.sigma)))}`);
+    }
+    return {
+      band: [...upper, ...lower.reverse()].join(' '),
+      line: {
+        x1: geom.xOfYear(y0),
+        y1: f(clampY(geom.yOf(fitY(y0)))),
+        x2: geom.xOfYear(y1),
+        y2: f(clampY(geom.yOf(fitY(y1)))),
+      },
+    };
+  }, [trend, geom, years]);
+
   if (!geom) {
     // Wrapper still renders so useChartWidth can measure it (chart-helpers
     // pattern — the measured element must exist for width to ever arrive).
@@ -216,34 +245,6 @@ function HistoricalChart({
     (best, y) => (y.tmin != null && (!best?.tmin || y.tmin < best.tmin) ? y : best),
     null,
   );
-
-  /* Trend geometry — regression ± 1σ band, clamped into the plot area. */
-  const trendGeom = useMemo(() => {
-    if (!trend || !geom) return null;
-    const fitY = (year: number) => trend.intercept + trend.slopePerYear * year;
-    const clampY = (y: number) =>
-      Math.min(height - CHART_BOTTOM, Math.max(CHART_TOP, y));
-    const yearsWithTmax = years.filter((y) => y.tmax != null);
-    if (yearsWithTmax.length === 0) return null;
-    const y0 = yearsWithTmax[0].year;
-    const y1 = yearsWithTmax[yearsWithTmax.length - 1].year;
-    const upper: string[] = [];
-    const lower: string[] = [];
-    for (let yr = y0; yr <= y1; yr += 1) {
-      const x = geom.xOfYear(yr);
-      upper.push(`${x},${f(clampY(geom.yOf(fitY(yr) + trend.sigma)))}`);
-      lower.push(`${x},${f(clampY(geom.yOf(fitY(yr) - trend.sigma)))}`);
-    }
-    return {
-      band: [...upper, ...lower.reverse()].join(' '),
-      line: {
-        x1: geom.xOfYear(y0),
-        y1: f(clampY(geom.yOf(fitY(y0)))),
-        x2: geom.xOfYear(y1),
-        y2: f(clampY(geom.yOf(fitY(y1)))),
-      },
-    };
-  }, [trend, geom, years]);
 
   const aria =
     `High and low temperatures on ${dateLabel} across ${withData.length} years, ` +

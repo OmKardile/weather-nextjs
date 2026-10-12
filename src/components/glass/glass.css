@@ -465,6 +465,43 @@
   );
 }
 
+/* Dock CONTENT scrim — unlike .dock-scrim (which darkens only the sky
+   inside the scene layer), this element sits inside the dock's nav,
+   above the forecast drawer/map content (z-30) but under the capsule.
+   It guarantees tab-label contrast when scrolled content passes under
+   the floating dock at Ultra-clear glass settings (iOS tab-bar
+   behavior over sheets). */
+.dock-content-scrim {
+  height: calc(104px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    rgb(4 16 16 / 0.46),
+    rgb(4 16 16 / 0.18) 58%,
+    transparent
+  );
+}
+
+[data-surface='light'] .dock-content-scrim {
+  background: linear-gradient(
+    to top,
+    rgb(6 24 26 / 0.34),
+    rgb(6 24 26 / 0.13) 58%,
+    transparent
+  );
+}
+
+/* Legibility floor — the scrim is about readability, not decoration,
+   so Reduce bright effects only softens it rather than removing it. */
+.lg-calm .dock-content-scrim {
+  background: linear-gradient(
+    to top,
+    rgb(4 16 16 / 0.32),
+    rgb(4 16 16 / 0.12) 58%,
+    transparent
+  );
+}
+
 /* ================================================================== */
 /* Card label typography — sentence case, 13px, no tracked caps         */
 /* ================================================================== */
