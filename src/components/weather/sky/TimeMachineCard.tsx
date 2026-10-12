@@ -54,6 +54,73 @@ const CHART_BOTTOM = 20; // year labels
 const LABEL_W = 44; // right gutter for the normal-line labels
 
 /* ------------------------------------------------------------------ */
+/* 30-year climate trend — OLS regression over the year highs           */
+/* ------------------------------------------------------------------ */
+
+export interface ClimateTrend {
+  /** °C per year (OLS slope over the years that have a tmax). */
+  slopePerYear: number;
+  /** °C at the regression midpoint. */
+  intercept: number;
+  /** Residual standard deviation (°C) — honest single-date noise. */
+  sigma: number;
+  /** Number of years that entered the fit. */
+  n: number;
+  firstYear: number;
+  lastYear: number;
+  midpointYear: number;
+}
+
+/**
+ * Least-squares trend of the daily high across the archive years.
+ * Returns null until at least 8 points exist — a shorter window makes
+ * "per decade" wording misleading.
+ */
+export function climateTrend(years: readonly HistoricalYear[]): ClimateTrend | null {
+  const pts: Array<{ year: number; tmax: number }> = [];
+  for (const y of years) {
+    if (y.tmax != null) pts.push({ year: y.year, tmax: y.tmax });
+  }
+  if (pts.length < 8) return null;
+
+  const n = pts.length;
+  const meanX = pts.reduce((s, p) => s + p.year, 0) / n;
+  const meanY = pts.reduce((s, p) => s + p.tmax, 0) / n;
+  let num = 0;
+  let den = 0;
+  for (const p of pts) {
+    num += (p.year - meanX) * (p.tmax - meanY);
+    den += (p.year - meanX) ** 2;
+  }
+  if (den === 0) return null;
+  const slopePerYear = num / den;
+  const intercept = meanY - slopePerYear * meanX;
+
+  let rss = 0;
+  for (const p of pts) {
+    rss += (p.tmax - (intercept + slopePerYear * p.year)) ** 2;
+  }
+  const sigma = n > 2 ? Math.sqrt(rss / (n - 2)) : 0;
+
+  return {
+    slopePerYear,
+    intercept,
+    sigma,
+    n,
+    firstYear: pts[0].year,
+    lastYear: pts[pts.length - 1].year,
+    midpointYear: meanX,
+  };
+}
+
+/** Signed per-decade delta formatted in the display units. */
+function formatTrendPerDecade(slopePerYear: number, units: Units): string {
+  const perDecade = slopePerYear * 10 * (units === 'metric' ? 1 : 1.8);
+  const sign = perDecade > 0 ? '+' : perDecade < 0 ? '−' : '';
+  return `${sign}${Math.abs(perDecade).toFixed(1)}°/decade`;
+}
+
+/* ------------------------------------------------------------------ */
 /* The year-by-year dot chart                                          */
 /* ------------------------------------------------------------------ */
 
@@ -71,6 +138,8 @@ function HistoricalChart({
   const [wrapRef, width] = useChartWidth<HTMLDivElement>();
   const [active, setActive] = useState<number | null>(null);
   const height = 190;
+
+  const trend = useMemo(() => climateTrend(years), [years]);
 
   const geom = useMemo(() => {
     const withData = years.filter((y) => y.tmax != null || y.tmin != null);
@@ -90,10 +159,11 @@ function HistoricalChart({
     const plotW = width - padX * 2 - LABEL_W;
     const slot = years.length > 1 ? plotW / (years.length - 1) : 0;
     const xOf = (i: number) => f(padX + slot * i);
+    const xOfYear = (year: number) => f(padX + slot * (year - years[0].year));
     const yOf = (t: number) =>
       f(CHART_TOP + (1 - (t - lo) / (hi - lo)) * (height - CHART_TOP - CHART_BOTTOM));
 
-    return { padX, slot, xOf, yOf, lo, hi };
+    return { padX, slot, xOf, xOfYear, yOf, lo, hi };
   }, [years, normal, width]);
 
   if (!geom) {
@@ -147,11 +217,42 @@ function HistoricalChart({
     null,
   );
 
+  /* Trend geometry — regression ± 1σ band, clamped into the plot area. */
+  const trendGeom = useMemo(() => {
+    if (!trend || !geom) return null;
+    const fitY = (year: number) => trend.intercept + trend.slopePerYear * year;
+    const clampY = (y: number) =>
+      Math.min(height - CHART_BOTTOM, Math.max(CHART_TOP, y));
+    const yearsWithTmax = years.filter((y) => y.tmax != null);
+    if (yearsWithTmax.length === 0) return null;
+    const y0 = yearsWithTmax[0].year;
+    const y1 = yearsWithTmax[yearsWithTmax.length - 1].year;
+    const upper: string[] = [];
+    const lower: string[] = [];
+    for (let yr = y0; yr <= y1; yr += 1) {
+      const x = geom.xOfYear(yr);
+      upper.push(`${x},${f(clampY(geom.yOf(fitY(yr) + trend.sigma)))}`);
+      lower.push(`${x},${f(clampY(geom.yOf(fitY(yr) - trend.sigma)))}`);
+    }
+    return {
+      band: [...upper, ...lower.reverse()].join(' '),
+      line: {
+        x1: geom.xOfYear(y0),
+        y1: f(clampY(geom.yOf(fitY(y0)))),
+        x2: geom.xOfYear(y1),
+        y2: f(clampY(geom.yOf(fitY(y1)))),
+      },
+    };
+  }, [trend, geom, years]);
+
   const aria =
     `High and low temperatures on ${dateLabel} across ${withData.length} years, ` +
     `${years[0].year} to ${years[years.length - 1].year}. ` +
     (normal.tmax != null && normal.tmin != null
       ? `30-year normal: high ${formatTemp(normal.tmax, units)}, low ${formatTemp(normal.tmin, units)}. `
+      : '') +
+    (trend
+      ? `Trend in highs: ${formatTrendPerDecade(trend.slopePerYear, units)} across ${trend.n} years, ±${(trend.sigma * (units === 'metric' ? 1 : 1.8)).toFixed(1)}° typical year-to-year spread. `
       : '') +
     (warmest?.tmax != null
       ? `Warmest high ${formatTemp(warmest.tmax, units)} in ${warmest.year}. `
@@ -236,6 +337,28 @@ function HistoricalChart({
             >
               L {formatTemp(normal.tmin, units)}
             </text>
+          </g>
+        ) : null}
+
+        {/* 30-year climate trend — regression band + line (drawn under
+            the dots so individual years stay the heroes). */}
+        {trendGeom && trend ? (
+          <g aria-hidden="true">
+            <polygon
+              points={trendGeom.band}
+              fill={trend.slopePerYear >= 0 ? WARM : COOL}
+              opacity={0.1}
+            />
+            <line
+              x1={trendGeom.line.x1}
+              y1={trendGeom.line.y1}
+              x2={trendGeom.line.x2}
+              y2={trendGeom.line.y2}
+              stroke={trend.slopePerYear >= 0 ? WARM : COOL}
+              strokeWidth={2}
+              strokeLinecap="round"
+              opacity={0.65}
+            />
           </g>
         ) : null}
 
@@ -383,6 +506,24 @@ export function TimeMachineCard({ city, bundle, units }: TimeMachineCardProps): 
 
   const loading = query.isPending && !data;
 
+  /* 30-year trend of the highs for the picked date (null < 8 points). */
+  const trend = useMemo(
+    () => (data && !isHistoricalError(data) ? climateTrend(data.years) : null),
+    [data],
+  );
+  const trendChip = useMemo(() => {
+    if (!trend) return null;
+    const perDecadeC = trend.slopePerYear * 10;
+    if (Math.abs(perDecadeC) < 0.1) {
+      return { tone: 'neutral' as const, text: 'Steady', hint: 'highs holding near the long-run mean' };
+    }
+    return {
+      tone: perDecadeC > 0 ? ('warm' as const) : ('cool' as const),
+      text: formatTrendPerDecade(trend.slopePerYear, units),
+      hint: `this date is ${perDecadeC > 0 ? 'warming' : 'cooling'} over ${trend.n} years`,
+    };
+  }, [trend, units]);
+
   return (
     <div className="glass animate-fade-up rounded-[var(--radius-card)] p-4 shadow-[var(--shadow-glass)] sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -469,6 +610,28 @@ export function TimeMachineCard({ city, bundle, units }: TimeMachineCardProps): 
         ) : null}
       </div>
 
+      {/* --- trend chip: the 30-year verdict for this date --- */}
+      {trendChip && trend ? (
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+          <span
+            className={cn(
+              'sky-chip tnum rounded-full px-3 py-1.5 text-[11px] font-semibold',
+              trendChip.tone === 'warm' && 'sky-tone-warm',
+              trendChip.tone === 'cool' && 'sky-tone-cool',
+            )}
+          >
+            {trendChip.tone === 'warm' ? '↑ ' : trendChip.tone === 'cool' ? '↓ ' : '→ '}
+            {trendChip.text}
+          </span>
+          <p className="text-xs text-surface-muted">
+            {trendChip.hint}
+            <span className="text-surface-faint">
+              {' '}· typical spread ±{(trend.sigma * (units === 'metric' ? 1 : 1.8)).toFixed(1)}°
+            </span>
+          </p>
+        </div>
+      ) : null}
+
       {/* --- chart / states --- */}
       <div className="mt-4">
         {loading ? (
@@ -512,7 +675,8 @@ export function TimeMachineCard({ city, bundle, units }: TimeMachineCardProps): 
               />
               <p className="tnum mt-3 text-[11px] leading-relaxed text-surface-faint">
                 Each dot is one year — large dots are daily highs (amber above the normal,
-                teal below), small dots are lows. Dashed lines mark the 30-year normal.
+                teal below), small dots are lows. Dashed lines mark the 30-year normal;
+                the solid line with its soft band is the 30-year trend in highs.
               </p>
             </>
           )

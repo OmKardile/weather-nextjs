@@ -73,8 +73,12 @@ export function ForecastDrawer({ snapPoint, onSnapPointChange, children }: Forec
 
           {/* Concentric radius: outer 28 − padding 12 = inner 16 on the
               scroll container's content well. Bottom padding keeps the
-              floating dock (64 + 12 + 24) from ever covering content. */}
-          <div className="scroll-slim flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+108px)] pt-2">
+              floating dock (64 + 12 + 24) from ever covering content.
+              The 5.64dvh term compensates the full-snap (0.94) overhang:
+              (1 − 0.94) × 94dvh of the sheet hangs below the viewport at
+              full snap, so padding measured from the box bottom must add
+              that overhang to clear the dock measured from the viewport. */}
+          <div className="scroll-slim flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-[calc(env(safe-area-inset-bottom)+108px+5.64dvh)] pt-2">
             {children}
           </div>
         </DrawerPrimitive.Content>
