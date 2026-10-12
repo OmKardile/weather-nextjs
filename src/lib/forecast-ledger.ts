@@ -218,6 +218,52 @@ export function ledgerScoredDayCount(): number {
   );
 }
 
+/**
+ * Unscored record dates for a city that are strictly older than the given
+ * ISO date (YYYY-MM-DD) — the backfill worklist. Returns [] when hydrate
+ * hasn't run yet (the hook always hydrates before asking).
+ */
+export function pendingBackfillDates(city: City, beforeDate: string): string[] {
+  const records = snapshot.map[ledgerCityKey(city)];
+  if (!records) return [];
+  return records
+    .filter((r) => r.aHigh === undefined && r.date < beforeDate)
+    .map((r) => r.date)
+    .slice(0, 10);
+}
+
+/**
+ * Backfill scorer: apply measured actuals to any unscored records of the
+ * city (bulk — the /api/ledger-backfill payload). Only pending records
+ * older than `beforeDate` are eligible so today's fresh call is never
+ * graded early. Returns the number of records newly scored.
+ */
+export function scoreBackfill(
+  city: City,
+  measured: Record<string, { max: number; min: number }>,
+  beforeDate: string,
+): number {
+  const key = ledgerCityKey(city);
+  const records = snapshot.map[key];
+  if (!records) return 0;
+
+  let scored = 0;
+  const next = records.map((r) => {
+    if (r.aHigh !== undefined || r.date >= beforeDate) return r;
+    const m = measured[r.date];
+    if (!m || !Number.isFinite(m.max) || !Number.isFinite(m.min)) return r;
+    scored += 1;
+    return { ...r, aHigh: m.max, aLow: m.min };
+  });
+
+  if (scored === 0) return 0;
+
+  snapshot = { map: { ...snapshot.map, [key]: next }, version: snapshot.version + 1 };
+  persist();
+  emit();
+  return scored;
+}
+
 /* ------------------------------------------------------------------ */
 /* Stats for the card (pure reads off the snapshot)                     */
 /* ------------------------------------------------------------------ */

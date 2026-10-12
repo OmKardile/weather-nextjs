@@ -30,10 +30,11 @@ Aether is a ground-up rebuild of [OmKardile/weather-nextjs](https://github.com/O
 **Weather data (Open-Meteo)**
 - City search with debounced autocomplete (300 ms, country flags, full keyboard navigation, `/` shortcut)
 - Current conditions with a live location-local clock, feels-like, today's hi/lo, and a **“+2° vs yesterday” chip** (today's forecast high vs yesterday's measured high — trend icon, color-coded direction)
-- 48-hour hourly strip (hourly wind speed included) plus a hand-rolled interactive SVG temperature chart (hover/touch scrub, keyboard-navigable, precipitation-probability bars)
+- 48-hour hourly strip (hourly wind speed included) with **golden-hour highlighting** (photogenic hours glow warm) plus a hand-rolled interactive SVG temperature chart (hover/touch scrub, keyboard-navigable, precipitation-probability bars)
 - 7-day forecast with week-normalized temperature range bars
-- **Forecast log — Aether scores itself**: each day's forecast high/low is recorded on first view and graded against the measured sky the next day; the card shows a rolling accuracy verdict, a last-7-days error-bar strip, and avg-miss / days-scored / clean-days tiles (own localStorage ledger, validated + capped)
+- **Forecast log — Aether scores itself**: each day's forecast high/low is recorded on first view and graded against the measured sky the next day (a backfill pass grades missed days via measured actuals); the card shows a rolling accuracy verdict, a last-7-days error-bar strip, and avg-miss / days-scored / clean-days tiles (own localStorage ledger, validated + capped)
 - Full metric grid: wind speed + 16-point compass direction, humidity + dew point, UV index with scale marker, visibility, pressure, cloud cover, precipitation chance, and a sun-arc with live daylight progress
+- **Sun safety** — the 48-hour UV curve as a band-colored chart with a now-marker and peak dot, personalized unprotected burn-time estimates by Fitzpatrick skin type I–VI (ISO erythemal-dose arithmetic, persisted preference), an SPF-30 line and the day's low-UV window
 - Moon phase card — phase name, illumination % and a full-moon countdown (zero-dependency calculation)
 - **Daylight tracker** — a semicircle solstice gauge placing today's daylight between the year's shortest and longest day at this latitude, a signed +Xm/day daylight-delta chip, sunrise / sunset / night pills, and the time to the next solstice
 - European Air Quality Index (EAQI) with pollutant breakdown (PM2.5 / PM10 / O₃ / NO₂), dominant pollutant, and a **24-hour AQI trend sparkline** (band-colored line, peak marker with time, screen-reader summary)

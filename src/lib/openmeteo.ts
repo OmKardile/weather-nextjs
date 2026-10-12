@@ -838,3 +838,40 @@ export async function fetchFlood(lat: number, lon: number): Promise<FloodRespons
   const available = daily.some((d) => d.discharge != null);
   return available ? { available: true, daily } : { available: false, daily: [] };
 }
+
+/* ------------------------------------------------------------------ */
+/* Measured daily actuals (forecast API, past_days) — ledger backfill   */
+/* ------------------------------------------------------------------ */
+
+export interface MeasuredDaily {
+  /** YYYY-MM-DD → measured high/low (°C). */
+  byDate: Record<string, { max: number; min: number }>;
+}
+
+/**
+ * Measured daily high/low for the last 7 days (forecast API with
+ * past_days — analysis data, no ERA5 lag). Powers the forecast-ledger
+ * backfill: unscored "morning call" records older than yesterday get
+ * their actuals even when the user skipped a day or more.
+ */
+export async function fetchMeasuredDaily(lat: number, lon: number): Promise<MeasuredDaily> {
+  const rlat = Math.round(lat * 10) / 10;
+  const rlon = Math.round(lon * 10) / 10;
+  const url =
+    `${FORECAST_URL}?latitude=${rlat}&longitude=${rlon}` +
+    `&past_days=7&forecast_days=1&daily=temperature_2m_max,temperature_2m_min&timezone=auto`;
+
+  const data = await fetchJson<{ daily?: OmArchiveDaily }>(url, 3_600);
+  const times = data.daily?.time ?? [];
+  const tmaxSeries = data.daily?.temperature_2m_max ?? [];
+  const tminSeries = data.daily?.temperature_2m_min ?? [];
+
+  const byDate: Record<string, { max: number; min: number }> = {};
+  for (let i = 0; i < times.length; i += 1) {
+    const max = tmaxSeries[i];
+    const min = tminSeries[i];
+    if (max == null || min == null) continue;
+    byDate[times[i]] = { max, min };
+  }
+  return { byDate };
+}

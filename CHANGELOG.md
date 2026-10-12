@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.4.0] — 2026-10-12
+
+Sun & honesty round: a **Sun safety** card personalizes burn-time
+estimates to your Fitzpatrick skin type over a band-colored UV curve,
+the **Forecast log learns to backfill** (missed visits no longer leave
+days ungraded), and golden hours now glow warmly in the hourly strip.
+
+### Added
+- **Sun safety card** (Details section) — the 48-hour UV curve as a
+  band-colored gradient area (the same low→extreme palette as the UV
+  metric tile: aurora / amber / orange / red / violet), with guide lines
+  at UV 3/6/8/11, a live now-marker and a labeled peak dot. A
+  Fitzpatrick I–VI selector (persisted `skinType` preference, default
+  II) personalizes **burn-time estimates** using ISO erythemal-dose
+  arithmetic (minutes ≈ MED × 2 ÷ (3 × UV); MED 200–1000 J/m² by
+  phototype) — shown for now and for today's peak, with an "SPF 30
+  multiplies it ~30×" line and a low-UV window callout ("UV stays ≤3
+  before 09:00 and after 16:00"). Night shows an honest "No UV — the
+  sun is down" instead of a meaningless dash. Full screen-reader
+  summary; estimates framed as estimates.
+- **Ledger backfill** — the Forecast log now grades itself even when you
+  skip days. New `/api/ledger-backfill` route + `fetchMeasuredDaily`
+  (forecast API with `past_days=7` — analysis data, no ERA5 lag, 1 h
+  shared cache). The ledger hook opportunistically fetches measured
+  actuals for pending records strictly older than yesterday (once per
+  city per session, best-effort; today's fresh call is never graded
+  early) and bulk-scores them through `scoreBackfill`. The badge signal
+  fires on backfilled days too.
+
+### Changed
+- **Golden hours glow in the hourly strip** — hour chips inside today's
+  or tomorrow's golden-hour windows (from the sky engine) get a subtle
+  warm amber underglow rising from the bottom edge + an amber time
+  label, with `title="Golden hour"` and an aria-label note. The "Now"
+  aurora treatment is untouched.
+- Night-time Sun safety readouts no longer show a bare "—" (see above).
+
 ## [3.3.0] — 2026-10-12
 
 Trust & delight round: Aether starts keeping score of itself. The new

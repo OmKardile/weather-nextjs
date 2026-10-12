@@ -32,9 +32,11 @@ import { MetricGrid } from '@/components/weather/MetricGrid';
 import { ModelCompare } from '@/components/weather/ModelCompare';
 import { MoonPhaseCard } from '@/components/weather/MoonPhaseCard';
 import { NextHourCard } from '@/components/weather/NextHourCard';
+import { daySkyTimes } from '@/components/weather/sky/sky-time';
 import { AuroraCard } from '@/components/weather/sky/AuroraCard';
 import { DaylightCard } from '@/components/weather/sky/DaylightCard';
 import { SkyCard } from '@/components/weather/sky/SkyCard';
+import { SunSafetyCard } from '@/components/weather/SunSafetyCard';
 import { TimeMachineCard } from '@/components/weather/sky/TimeMachineCard';
 import { TemperatureChart } from '@/components/weather/TemperatureChart';
 import { useEditMode } from '@/hooks/use-edit-mode';
@@ -239,6 +241,19 @@ export function ForecastSections({ city, bundle, units }: ForecastSectionsProps)
 
   const dailyCount = Math.min(forecastDays, bundle.daily.length);
 
+  // Golden-hour windows for today + tomorrow (the hourly strip highlights
+  // the photogenic hours with a warm underglow).
+  const goldenWindows = useMemo(() => {
+    const windows: Array<{ start: string; end: string; label: 'Golden hour' }> = [];
+    for (const day of [bundle.daily[0], bundle.daily[1]]) {
+      if (!day?.sunrise || !day?.sunset) continue;
+      const sky = daySkyTimes(day);
+      windows.push({ ...sky.goldenMorning, label: 'Golden hour' });
+      windows.push({ ...sky.goldenEvening, label: 'Golden hour' });
+    }
+    return windows;
+  }, [bundle.daily]);
+
   // Both optional cards fail silently — hide the whole section when
   // neither can render anything (still shown while pending).
   const showModelsSection =
@@ -347,7 +362,7 @@ export function ForecastSections({ city, bundle, units }: ForecastSectionsProps)
                 />
               </div>
               <div className="fs-stack mt-3">
-                <HourlyStrip hours={bundle.hourly} units={units} />
+                <HourlyStrip hours={bundle.hourly} units={units} goldenWindows={goldenWindows} />
               </div>
               <div className="fs-stack mt-3">
                 <NextHourCard minutely={bundle.minutely} units={units} />
@@ -402,6 +417,9 @@ export function ForecastSections({ city, bundle, units }: ForecastSectionsProps)
           return (
             <>
               <MetricGrid data={bundle} units={units} city={city} />
+              <div className="fs-stack mt-4">
+                <SunSafetyCard bundle={bundle} units={units} />
+              </div>
               <div className="fs-stack mt-4 sm:max-w-sm">
                 <MoonPhaseCard bundle={bundle} />
               </div>

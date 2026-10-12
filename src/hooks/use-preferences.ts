@@ -69,6 +69,11 @@ export type Density = 'comfortable' | 'compact';
 /** Liquid Glass transparency: 0 = ultra clear, 100 = fully tinted. */
 export type GlassTransparency = number;
 
+/** Fitzpatrick phototype I–VI (sun-safety burn-time estimates). */
+export type SkinType = 1 | 2 | 3 | 4 | 5 | 6;
+
+const SKIN_TYPES: readonly number[] = [1, 2, 3, 4, 5, 6];
+
 interface PreferencesState {
   units: Units;
   forecastDays: ForecastDays;
@@ -90,6 +95,8 @@ interface PreferencesState {
   reduceBrightEffects: boolean;
   /** Device-tilt glass highlights (motion sensor, permission-gated on iOS). */
   tiltGlowEnabled: boolean;
+  /** Fitzpatrick phototype I–VI — personalizes sun-safety burn times. */
+  skinType: SkinType;
   savedCities: City[];
   lastCity: City | null;
   setUnits: (units: Units) => void;
@@ -105,6 +112,7 @@ interface PreferencesState {
   setGlassTransparency: (value: GlassTransparency) => void;
   setReduceBrightEffects: (enabled: boolean) => void;
   setTiltGlowEnabled: (enabled: boolean) => void;
+  setSkinType: (type: SkinType) => void;
   saveCity: (city: City) => void;
   removeCity: (id: number) => void;
   /** Reorder saved cities (new full order, e.g. from a drag-and-drop list). */
@@ -132,6 +140,7 @@ export const usePreferences = create<PreferencesState>()(
       glassTransparency: 0,
       reduceBrightEffects: false,
       tiltGlowEnabled: false,
+      skinType: 2,
       savedCities: [],
       lastCity: null,
 
@@ -166,6 +175,8 @@ export const usePreferences = create<PreferencesState>()(
       setReduceBrightEffects: (enabled) => set({ reduceBrightEffects: enabled }),
 
       setTiltGlowEnabled: (enabled) => set({ tiltGlowEnabled: enabled }),
+
+      setSkinType: (type) => set({ skinType: type }),
 
       saveCity: (city) =>
         set((state) =>
@@ -238,6 +249,11 @@ export const usePreferences = create<PreferencesState>()(
         (persisted as { reduceBrightEffects?: boolean } | undefined)?.reduceBrightEffects === true,
       tiltGlowEnabled:
         (persisted as { tiltGlowEnabled?: boolean } | undefined)?.tiltGlowEnabled === true,
+      skinType: SKIN_TYPES.includes(
+        (persisted as { skinType?: number } | undefined)?.skinType as number,
+      )
+        ? ((persisted as { skinType?: SkinType }).skinType as SkinType)
+        : current.skinType,
     }) },
   ),
 );
