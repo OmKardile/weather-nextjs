@@ -14,21 +14,14 @@ import type { City, Units } from '@/types/weather';
 
 const MAX_SAVED_CITIES = 8;
 
-/** Theme preference: 'auto' follows the scene's surface, others force it. */
-export type ThemeMode = 'auto' | 'light' | 'dark';
-
 /** Daily-forecast horizon: 7 days by default, 16 when the user opts in. */
 export type ForecastDays = 7 | 16;
 
 /** Forecast-section spacing: roomy default vs tighter information density. */
 export type Density = 'comfortable' | 'compact';
 
-/** Accent presets — shift the aurora hue (CSS var overrides in globals.css). */
-export type Accent = 'aurora' | 'sky' | 'sunset' | 'meadow';
-
 interface PreferencesState {
   units: Units;
-  theme: ThemeMode;
   forecastDays: ForecastDays;
   /** AI persona — tone only, applied to briefing/chat/story/planner text. */
   aiVoice: AiVoiceId;
@@ -42,13 +35,10 @@ interface PreferencesState {
   hiddenSections: SectionId[];
   /** Forecast-section spacing. */
   density: Density;
-  /** Aurora hue preset. */
-  accent: Accent;
   savedCities: City[];
   lastCity: City | null;
   setUnits: (units: Units) => void;
   toggleUnits: () => void;
-  setTheme: (theme: ThemeMode) => void;
   setAiVoice: (voice: AiVoiceId) => void;
   setForecastDays: (days: ForecastDays) => void;
   setAmbientSoundEnabled: (enabled: boolean) => void;
@@ -57,7 +47,6 @@ interface PreferencesState {
   toggleSectionHidden: (id: SectionId) => void;
   restoreAllSections: () => void;
   setDensity: (density: Density) => void;
-  setAccent: (accent: Accent) => void;
   saveCity: (city: City) => void;
   removeCity: (id: number) => void;
   isSaved: (id: number) => boolean;
@@ -73,7 +62,6 @@ export const usePreferences = create<PreferencesState>()(
   persist(
     (set, get) => ({
       units: 'metric',
-      theme: 'auto',
       forecastDays: 7,
       aiVoice: 'pro',
       ambientSoundEnabled: false,
@@ -81,15 +69,12 @@ export const usePreferences = create<PreferencesState>()(
       sectionOrder: [...DEFAULT_SECTION_ORDER],
       hiddenSections: [],
       density: 'comfortable',
-      accent: 'aurora',
       savedCities: [],
       lastCity: null,
 
       setUnits: (units) => set({ units }),
       toggleUnits: () =>
         set((state) => ({ units: state.units === 'metric' ? 'imperial' : 'metric' })),
-
-      setTheme: (theme) => set({ theme }),
 
       setAiVoice: (voice) => set({ aiVoice: voice }),
 
@@ -112,8 +97,6 @@ export const usePreferences = create<PreferencesState>()(
 
       setDensity: (density) => set({ density }),
 
-      setAccent: (accent) => set({ accent }),
-
       saveCity: (city) =>
         set((state) =>
           state.savedCities.some((saved) => saved.id === city.id)
@@ -128,11 +111,17 @@ export const usePreferences = create<PreferencesState>()(
 
       setLastCity: (city) => set({ lastCity: city }),
     }),
-    { name: 'aether-preferences', version: 2, merge: (persisted, current) => ({
+    { name: 'aether-preferences', version: 3, merge: (persisted, current) => ({
       ...current,
-      ...(persisted as Partial<PreferencesState> | undefined),
+      ...((() => {
+        // v3 dropped `theme` + `accent` (the interface now themes itself
+        // from the live sky; the aurora accent is the brand). Strip the
+        // retired keys so re-persisted state stays clean.
+        const { theme: _theme, accent: _accent, ...rest } =
+          (persisted as Record<string, unknown> | undefined) ?? {};
+        return rest as Partial<PreferencesState>;
+      })()),
       // New fields keep their defaults when upgrading from older persisted state.
-      theme: (persisted as { theme?: ThemeMode } | undefined)?.theme ?? current.theme,
       aiVoice: AI_VOICE_IDS.includes((persisted as { aiVoice?: AiVoiceId } | undefined)?.aiVoice as AiVoiceId)
         ? ((persisted as { aiVoice?: AiVoiceId }).aiVoice as AiVoiceId)
         : current.aiVoice,
@@ -153,10 +142,6 @@ export const usePreferences = create<PreferencesState>()(
       density: (persisted as { density?: Density } | undefined)?.density === 'compact'
         ? 'compact'
         : 'comfortable',
-      accent: (() => {
-        const value = (persisted as { accent?: Accent } | undefined)?.accent;
-        return value === 'sky' || value === 'sunset' || value === 'meadow' ? value : 'aurora';
-      })(),
     }) },
   ),
 );

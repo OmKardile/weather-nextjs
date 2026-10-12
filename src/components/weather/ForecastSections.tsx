@@ -39,7 +39,7 @@ import { useEditMode } from '@/hooks/use-edit-mode';
 import { useEnsemble } from '@/hooks/use-ensemble';
 import { useModels } from '@/hooks/use-models';
 import { usePreferences } from '@/hooks/use-preferences';
-import { SECTION_TITLES } from '@/lib/sections';
+import { DEFAULT_SECTION_ORDER, SECTION_TITLES } from '@/lib/sections';
 import type { SectionId } from '@/lib/sections';
 import { getDayPhase } from '@/lib/time';
 import type { City, Units, WeatherBundle } from '@/types/weather';
@@ -148,6 +148,16 @@ function SortableSectionShell({
       {...listeners}
       aria-label={`Reorder ${title} card`}
       title="Drag to reorder"
+      // Inside the mobile forecast drawer (vaul) the whole sheet is a drag
+      // surface — stop the pointerdown from bubbling so dnd-kit owns the
+      // gesture instead of the sheet (data-vaul-no-drag is the belt to the
+      // suspenders). dnd-kit's own listener still runs: we call it manually
+      // because this override replaces the spread {...listeners} prop.
+      data-vaul-no-drag=""
+      onPointerDown={(event) => {
+        event.stopPropagation();
+        (listeners?.onPointerDown as undefined | ((e: React.PointerEvent) => void))?.(event);
+      }}
       className="glass-subtle focus-ring flex h-7 w-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-full text-surface-muted active:cursor-grabbing"
     >
       <Icon name="grip" size={14} />
@@ -160,6 +170,8 @@ function SortableSectionShell({
       onClick={onHide}
       aria-label={`Hide ${title} card`}
       title="Hide card"
+      data-vaul-no-drag=""
+      onPointerDown={(event) => event.stopPropagation()}
       className="glass-subtle focus-ring flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-surface-muted transition-colors duration-200 hover:text-surface"
     >
       <Icon name="x" size={13} />
@@ -421,17 +433,29 @@ export function ForecastSections({ city, bundle, units }: ForecastSectionsProps)
     <div ref={containerRef} data-density={density} className="fs-sections flex flex-col gap-5">
       {/* Edit-mode header: enter button, or the toolbar + Done while editing. */}
       {editMode ? (
-        <div className="glass-subtle flex flex-wrap items-center justify-between gap-3 rounded-full px-4 py-2">
+        <div
+          className="glass-subtle flex flex-wrap items-center justify-between gap-3 rounded-full px-4 py-2"
+          data-vaul-no-drag=""
+        >
           <p className="text-xs font-medium text-surface-muted">
             Drag the handles to reorder · × hides a card
           </p>
-          <button
-            type="button"
-            onClick={() => setEditMode(false)}
-            className="focus-ring rounded-full bg-aurora-500 px-4 py-1.5 text-xs font-semibold text-[#04211C] shadow-[0_0_14px_-4px_rgb(34_188_160/0.8)] transition-transform duration-200 hover:active:scale-95"
-          >
-            Done
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setSectionOrder([...DEFAULT_SECTION_ORDER])}
+              className="glass-subtle focus-ring rounded-full px-4 py-1.5 text-xs font-semibold text-surface-muted transition-colors duration-200 hover:text-surface"
+            >
+              Reset order
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditMode(false)}
+              className="focus-ring rounded-full bg-aurora-500 px-4 py-1.5 text-xs font-semibold text-[#04211C] shadow-[0_0_14px_-4px_rgb(34_188_160/0.8)] transition-transform duration-200 hover:active:scale-95"
+            >
+              Done
+            </button>
+          </div>
         </div>
       ) : (
         <div className="flex justify-end">

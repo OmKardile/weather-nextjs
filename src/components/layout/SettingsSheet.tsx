@@ -7,7 +7,7 @@ import { Glass } from '@/components/glass/Glass';
 import { Icon } from '@/components/icons/Icon';
 import { useEditMode } from '@/hooks/use-edit-mode';
 import { usePreferences } from '@/hooks/use-preferences';
-import type { Density, ThemeMode } from '@/hooks/use-preferences';
+import type { Density } from '@/hooks/use-preferences';
 import { toggleAmbientSound } from '@/hooks/use-ambient-sound';
 import { useAchievements } from '@/hooks/use-achievements';
 import { ACHIEVEMENTS } from '@/lib/achievements';
@@ -19,16 +19,16 @@ import type { Units } from '@/types/weather';
 import { cn } from '@/lib/utils';
 
 /* ================================================================== */
-/* Settings — units, appearance, AI voice, AI note + credits.          */
+/* Settings — units, cards, AI voice, AI note + credits.               */
 /* SettingsContent is shared by the desktop dialog and the mobile tab. */
+/* The interface theme itself is not a setting: it follows the live    */
+/* sky at the selected city (dawn/day/dusk/night re-skin everything).  */
 /* ================================================================== */
 
 interface SettingsContentProps {
   units: Units;
   onSetUnits: (units: Units) => void;
-  theme: ThemeMode;
-  onSetTheme: (theme: ThemeMode) => void;
-  /** Called when the user activates card edit mode (desktop closes the dialog). */
+  /** Called when the user activates card edit mode (navigates to the cards). */
   onCustomize?: () => void;
   className?: string;
 }
@@ -241,45 +241,6 @@ function HiddenCardsControl(): JSX.Element {
   );
 }
 
-const ACCENT_SWATCHES: Array<{ id: 'aurora' | 'sky' | 'sunset' | 'meadow'; label: string; color: string }> = [
-  { id: 'aurora', label: 'Aurora teal', color: '#22bca0' },
-  { id: 'sky', label: 'Sky blue', color: '#227cbc' },
-  { id: 'sunset', label: 'Sunset coral', color: '#bc5022' },
-  { id: 'meadow', label: 'Meadow green', color: '#49bc22' },
-];
-
-function AccentControl(): JSX.Element {
-  const hydrated = useHydrated();
-  const accent = usePreferences((s) => s.accent);
-  const setAccent = usePreferences((s) => s.setAccent);
-
-  const active = hydrated ? accent : 'aurora';
-  return (
-    <div className="flex items-center gap-2" role="group" aria-label="Accent color">
-      {ACCENT_SWATCHES.map((swatch) => {
-        const isActive = active === swatch.id;
-        return (
-          <button
-            key={swatch.id}
-            type="button"
-            aria-pressed={isActive}
-            aria-label={swatch.label}
-            title={swatch.label}
-            onClick={isActive ? undefined : () => setAccent(swatch.id)}
-            className={cn(
-              'focus-ring h-7 w-7 rounded-full border transition-all duration-200',
-              isActive
-                ? 'border-transparent ring-2 ring-[var(--surface-ring)] ring-offset-2 ring-offset-transparent'
-                : 'border-[var(--surface-border)] hover:scale-110',
-            )}
-            style={{ backgroundColor: swatch.color }}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
 /* ------------------------------------------------------------------ */
 /* Badge shelf — earned badges lit, locked ones dimmed.                */
 /* ------------------------------------------------------------------ */
@@ -336,8 +297,6 @@ function BadgeShelf(): JSX.Element {
 export function SettingsContent({
   units,
   onSetUnits,
-  theme,
-  onSetTheme,
   onCustomize,
   className,
 }: SettingsContentProps) {
@@ -358,21 +317,14 @@ export function SettingsContent({
         />
       </SettingsRow>
 
-      <SettingsRow label="Appearance" hint="Auto follows the live sky scene">
-        <Segmented
-          ariaLabel="Appearance"
-          value={theme}
-          onChange={onSetTheme}
-          options={[
-            { value: 'auto', label: 'Auto' },
-            { value: 'light', label: 'Light' },
-            { value: 'dark', label: 'Dark' },
-          ]}
-        />
-      </SettingsRow>
-
-      <SettingsRow label="Accent" hint="Shifts the aurora hue across the app">
-        <AccentControl />
+      <SettingsRow
+        label="Appearance"
+        hint="Aether themes itself from the live sky at your city — dawn, day, dusk and night. No manual dark mode."
+      >
+        <span className="glass-subtle inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-surface-muted">
+          <Icon name="sunrise" size={13} aria-hidden="true" />
+          Follows the sky
+        </span>
       </SettingsRow>
 
       <SettingsRow label="Card density" hint="Comfortable spacing or a tighter fit">
@@ -391,7 +343,7 @@ export function SettingsContent({
         <AmbientSoundControl />
       </SettingsRow>
 
-      <SettingsRow label="Customize cards" hint="Drag to reorder · × hides a card">
+      <SettingsRow label="Customize cards" hint="Opens your forecast cards — drag to reorder, × to hide">
         <CustomizeCardsControl onCustomize={onCustomize} />
       </SettingsRow>
 
@@ -433,7 +385,7 @@ export function SettingsContent({
 
       <div className="py-3.5">
         <p className="text-xs leading-relaxed text-surface-faint">
-          Aether 2.0.1 · forecast &amp; air quality by Open-Meteo (CAMS) · geocoding by
+          Aether 3.0.0 · forecast &amp; air quality by Open-Meteo (CAMS) · geocoding by
           Open-Meteo &amp; Nominatim · AI by Gemini
         </p>
       </div>
@@ -444,6 +396,8 @@ export function SettingsContent({
 interface SettingsSheetProps extends SettingsContentProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Runs after edit mode starts from the dialog (dialog closes itself). */
+  onCustomizeCards?: () => void;
 }
 
 export function SettingsSheet({
@@ -451,8 +405,7 @@ export function SettingsSheet({
   onOpenChange,
   units,
   onSetUnits,
-  theme,
-  onSetTheme,
+  onCustomizeCards,
 }: SettingsSheetProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -465,9 +418,10 @@ export function SettingsSheet({
           <SettingsContent
             units={units}
             onSetUnits={onSetUnits}
-            theme={theme}
-            onSetTheme={onSetTheme}
-            onCustomize={() => onOpenChange(false)}
+            onCustomize={() => {
+              onOpenChange(false);
+              onCustomizeCards?.();
+            }}
           />
         </Glass>
       </DialogContent>
@@ -480,7 +434,7 @@ function VisuallyHiddenTitle() {
     <>
       <DialogTitle className="sr-only">Settings</DialogTitle>
       <DialogDescription className="sr-only">
-        Units, appearance and AI preferences.
+        Units, cards, sound and AI preferences.
       </DialogDescription>
     </>
   );

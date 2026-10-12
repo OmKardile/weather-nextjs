@@ -13,15 +13,15 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Icon } from '@/components/icons/Icon';
 import { useCitySearch } from '@/hooks/use-city-search';
-import type { ThemeMode } from '@/hooks/use-preferences';
 import { countryFlag } from '@/lib/units';
 import type { City, Units } from '@/types/weather';
 import { cn } from '@/lib/utils';
 
 /* ================================================================== */
 /* CommandPalette — ⌘K Spotlight.                                       */
-/* Search cities (live geocoding), switch units/appearance, open AI,    */
-/* save the current city, jump to sections. Full keyboard navigation.   */
+/* Search cities (live geocoding), switch units, open AI, customize     */
+/* cards, save the current city, jump to sections. Full keyboard nav.   */
+/* (No theme command — the interface themes itself from the live sky.)  */
 /* ================================================================== */
 
 interface CommandPaletteProps {
@@ -31,11 +31,10 @@ interface CommandPaletteProps {
   activeCity: City | null;
   activeCitySaved: boolean;
   units: Units;
-  theme: ThemeMode;
   mapOpen: boolean;
   onSelectCity: (city: City) => void;
   onToggleUnits: () => void;
-  onSetTheme: (theme: ThemeMode) => void;
+  onCustomizeCards: () => void;
   onAskAi: () => void;
   onToggleMap: () => void;
   onLocate: () => void;
@@ -77,11 +76,10 @@ export function CommandPalette(props: CommandPaletteProps) {
     activeCity,
     activeCitySaved,
     units,
-    theme,
     mapOpen,
     onSelectCity,
     onToggleUnits,
-    onSetTheme,
+    onCustomizeCards,
     onAskAi,
     onToggleMap,
     onLocate,
@@ -235,6 +233,14 @@ export function CommandPalette(props: CommandPaletteProps) {
                     Ask AI about the weather
                   </CommandItem>
                   <CommandItem
+                    value="customize-cards"
+                    onSelect={() => run(onCustomizeCards)}
+                    className="rounded-xl text-surface aria-selected:bg-aurora-500/15"
+                  >
+                    <Icon name="grip" size={16} className="shrink-0 text-surface-faint" />
+                    Customize cards
+                  </CommandItem>
+                  <CommandItem
                     value="map"
                     onSelect={() => run(onToggleMap)}
                     className="rounded-xl text-surface aria-selected:bg-aurora-500/15"
@@ -242,35 +248,6 @@ export function CommandPalette(props: CommandPaletteProps) {
                     <Icon name="map" size={16} className="shrink-0 text-aurora-400" />
                     {mapOpen ? 'Close map' : 'Open map'}
                   </CommandItem>
-                </CommandGroup>
-
-                <CommandSeparator className="my-1 bg-[var(--surface-border)]" />
-
-                <CommandGroup heading="Appearance">
-                  {(['auto', 'light', 'dark'] as const).map((mode) => (
-                    <CommandItem
-                      key={mode}
-                      value={`theme-${mode}`}
-                      onSelect={() => run(() => onSetTheme(mode))}
-                      className="rounded-xl text-surface aria-selected:bg-aurora-500/15"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          'h-2 w-2 rounded-full',
-                          mode === 'auto' && 'bg-gradient-to-br from-aurora-300 to-[#0e2a2e]',
-                          mode === 'light' && 'bg-[#F6ECD4]',
-                          mode === 'dark' && 'bg-[#0A2B2A]',
-                        )}
-                      />
-                      {mode === 'auto' ? 'Auto (follow the sky)' : mode === 'light' ? 'Light' : 'Dark'}
-                      {theme === mode && (
-                        <span className="ml-auto text-aurora-400" aria-hidden="true">
-                          <Icon name="check" size={14} />
-                        </span>
-                      )}
-                    </CommandItem>
-                  ))}
                 </CommandGroup>
 
                 {activeCity && (

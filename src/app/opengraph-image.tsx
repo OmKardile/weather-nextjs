@@ -1,8 +1,12 @@
 import { ImageResponse } from 'next/og';
+import { LOGO_MARK_SVG } from '@/components/brand/Logo';
 
 export const alt = 'Aether — Weather, elevated.';
 export const size = { width: 1200, height: 630 };
 export const contentType = 'image/png';
+
+/** The brand mark as a self-contained data URI (satori renders data-URL <img>). */
+const MARK_DATA_URI = `data:image/svg+xml;base64,${Buffer.from(LOGO_MARK_SVG).toString('base64')}`;
 
 export default function OpenGraphImage() {
   return new ImageResponse(
@@ -35,71 +39,22 @@ export default function OpenGraphImage() {
             display: 'flex',
           }}
         />
-        {/* Rising sun over waves mark */}
+        {/* Altitude-A brand mark */}
         <div
           style={{
             display: 'flex',
-            alignItems: 'flex-end',
-            gap: 0,
+            alignItems: 'center',
+            justifyContent: 'center',
             marginBottom: 44,
           }}
         >
-          <div
-            style={{
-              width: 132,
-              height: 132,
-              borderRadius: 34,
-              background: 'linear-gradient(135deg, #45D1B3 0%, #0F5F55 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              boxShadow: '0 24px 80px -20px rgba(69,209,179,0.8)',
-            }}
-          >
-            <div
-              style={{
-                width: 132,
-                height: 132,
-                borderRadius: 34,
-                display: 'flex',
-                position: 'absolute',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
-              <div
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 9999,
-                  background: '#F6FEFB',
-                  marginTop: -26,
-                  display: 'flex',
-                }}
-              />
-              <div
-                style={{
-                  width: 84,
-                  height: 5,
-                  borderRadius: 9999,
-                  background: '#F6FEFB',
-                  marginTop: 34,
-                  display: 'flex',
-                }}
-              />
-              <div
-                style={{
-                  width: 64,
-                  height: 4,
-                  borderRadius: 9999,
-                  background: '#F6FEFB',
-                  opacity: 0.6,
-                  marginTop: 52,
-                  display: 'flex',
-                }}
-              />
-            </div>
-          </div>
+          <img
+            src={MARK_DATA_URI}
+            width={168}
+            height={168}
+            alt=""
+            style={{ borderRadius: 42, display: 'flex' }}
+          />
         </div>
 
         <div
@@ -132,7 +87,7 @@ export default function OpenGraphImage() {
             gap: 14,
           }}
         >
-          {['24h trends', '7-day outlook', 'Air quality', 'Live skies'].map((chip) => (
+          {['Live map', 'AI briefings', '16-day outlook', 'Sky mode'].map((chip) => (
             <div
               key={chip}
               style={{

@@ -796,3 +796,30 @@ Stage Summary:
 - All 3 features LIVE AND VERIFIED with zero code changes: (1) Sky card — day-phase gradient strip + now-marker + golden/blue-hour windows + live countdown + stargazing score with 3 factor meters + scrolling 14-night moon strip; (2) Aurora card — NOAA SWPC Kp gauge + trend word + 3-day sparkline + 3-tier latitude note (Tokyo "not tonight" at Kp 3.0); (3) Time machine — 30-year ERA5 year dots + warmer/cooler-than-normal badge + month/day pickers (Feb 29 safe) + Back to today
 - Evidence: live DOM/aria dumps (strip, gauge, sparkline, dots all expose correct aria-labels), scrollWidth measurements, console clean, lint + tsc clean, palette item list dump
 - Known issues/notes: aurora note says "36°N" (|35.7| rounded — intentional); day-strip is a fixed 24h bar by design (only the moon strip scrolls); ForecastSections renders twice by design (desktop column + mobile snap drawer) so #sky/#timemachine queries return 2 instances — not a duplication bug
+
+---
+Task ID: 18
+Agent: main (Z.ai Code)
+Task: User feedback round — remove the broken Appearance setting (theme follows the location's sky), remove the accent picker, fix "Customize cards" not working, plus a new logo. Shipped as v3.0.0.
+
+Work Log:
+- Read worklog (Tasks 1–17 complete: v2 shell, map, alerts, sky/time-machine, sound, achievements, share, AI suite all live).
+- Removed `ThemeMode`/`theme`/`setTheme` and `Accent`/`accent`/`setAccent` from use-preferences (persist version 2→3; merge strips retired keys from old localStorage).
+- AetherApp: `surfaceMode = scene.surface` always (dawn/day/dusk/night of the ACTIVE CITY drives every glass token); removed `data-accent` from the root.
+- SettingsSheet: Appearance row replaced with read-only "Follows the sky" pill + explanatory hint; AccentControl + 85 lines of `[data-accent=...]` CSS deleted from globals.css; version string → 3.0.0.
+- CommandPalette: Appearance group removed; new "Customize cards" action.
+- Customize-cards fixes: (1) new `handleCustomizeCards` in AetherApp — desktop closes the settings dialog + smooth-scrolls #main-scroll to the sections (deterministic rect math, 120ms after dialog exit); mobile switches dock to Today + expands drawer to full snap AFTER the tab-switch snap reset (120ms timeout beats the reset race). (2) dnd handles/hide buttons get `data-vaul-no-drag` + pointerdown stopPropagation (dnd-kit's own listener called manually since the override replaces the spread prop) — dragging inside the vaul sheet no longer drags the sheet. (3) Edit toolbar gains "Reset order".
+- New "Altitude A" logo: geometric A + wave crossbar + golden sun in the counter on aurora-teal gradient; exported LOGO_MARK_SVG constant; regenerated icon.svg, public/logo.svg, apple-icon.png (180), icons 192/512/maskable-512 via sharp; opengraph-image.tsx now renders the exact mark (data-URI img) instead of div approximations; ShareCardButton/StateViews/SiteFooter pick it up via <LogoMark> automatically.
+- README updated (palette bullet + scene-driven theming line); CHANGELOG [3.0.0]; package.json 3.0.0.
+
+QA (agent-browser, session v3fix, desktop 1440×900 + mobile 390×844, city=Mumbai):
+- Settings dialog: no theme/accent controls, info row present; old persisted theme/accent keys stripped.
+- REAL user flow verified with unambiguous scoped selectors: Settings→Customize ⇒ dialog closes + 8 edit handles + scroll lands (573/1113px); drag hourly→daily reorders DOM + persists to localStorage; Reset order restores; Hide × removes card, Settings→Hidden cards restores; palette "Customize cards" command ⇒ same flow.
+- Mobile: Settings tab→Customize ⇒ Today tab + drawer expanded + edit toolbar; REAL drag inside vaul drawer reorders AND the sheet does not move (fix confirmed).
+- VLM contrast QA: night scene (dark) PASS (all text AA), day scene (light) PASS, alert banners (severe/moderate tones, light surface) PASS. No console errors, ESLint clean (1 warning fixed), dev.log clean, GET / 200.
+- NOTE for future agents: Radix dialogs are position:fixed → `offsetParent` is always null; use getBoundingClientRect for visibility checks. Synthetic KeyboardEvent('Escape') does NOT close Radix dialogs — use agent-browser `press Escape`. The vaul drawer and settings dialog both have role=dialog — scope button queries or you'll click the wrong instance (cost me two false-negative drag tests).
+
+Stage Summary:
+- v3.0.0 shipped: theme = sky (no manual appearance), single aurora accent, customize-cards flow fully working on desktop + mobile, new Altitude-A brand mark across all surfaces.
+- User's three complaints addressed and browser-verified end to end.
+- No known regressions; nothing blocked. Next-phase candidates: README "how to add a scene" already documented; consider v3 polish round (Lighthouse pass), saved-city reordering, radar layer from Unreleased list.

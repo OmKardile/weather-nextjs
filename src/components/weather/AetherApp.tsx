@@ -9,6 +9,7 @@ import { usePreferences } from '@/hooks/use-preferences';
 import { useWeather } from '@/hooks/use-weather';
 import { useAmbientSound } from '@/hooks/use-ambient-sound';
 import { useAchievementObserver } from '@/hooks/use-achievements';
+import { useEditMode } from '@/hooks/use-edit-mode';
 import { loadCachedBundle } from '@/lib/sections';
 import { getScene } from '@/lib/scenes';
 import { getDayPhase } from '@/lib/time';
@@ -76,12 +77,10 @@ export function AetherApp() {
   const { toast } = useToast();
   const geolocation = useGeolocation();
   const units = usePreferences((state) => state.units);
-  const theme = usePreferences((state) => state.theme);
   const savedCities = usePreferences((state) => state.savedCities);
   const lastCity = usePreferences((state) => state.lastCity);
-  const { setUnits, toggleUnits, setTheme, saveCity, removeCity, setLastCity } =
+  const { setUnits, toggleUnits, saveCity, removeCity, setLastCity } =
     usePreferences.getState();
-  const accent = usePreferences((state) => state.accent);
 
   const weather = useWeather(activeCity);
   const liveBundle = weather.data ?? null;
@@ -199,8 +198,10 @@ export function AetherApp() {
     [bundle, dayPhase, sceneOverride],
   );
 
-  // Auto follows the scene; manual picks force the surface tokens.
-  const surfaceMode = theme === 'auto' ? scene.surface : theme;
+  // The interface surface follows the live sky at the selected city —
+  // dawn/day/dusk/night re-theme everything. No manual dark mode: the
+  // scene always wins, so contrast stays AA in every condition.
+  const surfaceMode = scene.surface;
   const tint = sceneOverride?.condition ?? bundle?.current.condition ?? 'clear';
   const ambientPhase = sceneOverride?.phase ?? dayPhase;
 
@@ -288,6 +289,34 @@ export function AetherApp() {
     }
   }, []);
 
+  // --------------------------- Customize cards --------------------------- //
+  // Edit mode is entered from three places (Settings dialog, mobile Settings
+  // tab, ⌘K). After turning it on we always route the user to where the
+  // cards actually live: desktop scrolls the main column to the cards,
+  // mobile switches to the Today tab and expands the forecast drawer.
+  const handleCustomizeCards = useCallback(() => {
+    useEditMode.getState().setEditMode(true);
+    if (window.matchMedia('(min-width: 1024px)').matches) {
+      // Scroll the main column itself (deterministic, and immune to the
+      // section remount that edit mode triggers). Retried once because the
+      // closing settings dialog can eat an immediate smooth scroll.
+      window.setTimeout(() => {
+        const main = mainScrollRef.current;
+        const hourly = main?.querySelector<HTMLElement>('[data-section-id="hourly"]');
+        if (!main || !hourly) return;
+        const top =
+          hourly.getBoundingClientRect().top - main.getBoundingClientRect().top + main.scrollTop - 12;
+        main.scrollTo({ top, behavior: 'smooth' });
+      }, 120);
+    } else {
+      setDockTab('today');
+      // The dock-tab switch above resets the drawer to peek (see the snap
+      // reset effect) — expand to full *after* that settles so the cards
+      // (and their edit handles) are actually in view.
+      window.setTimeout(() => setDrawerSnap(DRAWER_SNAPS[2]), 120);
+    }
+  }, []);
+
   // ------------------------------- Map mode ------------------------------ //
   const handleToggleMap = useCallback(() => {
     if (mapOpen) {
@@ -337,7 +366,6 @@ export function AetherApp() {
     <div
       data-surface={surfaceMode}
       data-tint={tint}
-      data-accent={mounted ? accent : 'aurora'}
       className="relative flex min-h-screen flex-col lg:h-screen lg:min-h-0 lg:overflow-hidden"
     >
       <WeatherScene scene={scene} />
@@ -452,8 +480,7 @@ export function AetherApp() {
                 <SettingsContent
                   units={units}
                   onSetUnits={setUnits}
-                  theme={theme}
-                  onSetTheme={setTheme}
+                  onCustomize={handleCustomizeCards}
                 />
               </Glass>
             )}
@@ -527,11 +554,10 @@ export function AetherApp() {
         activeCity={activeCity}
         activeCitySaved={isSaved}
         units={units}
-        theme={theme}
         mapOpen={mapOpen}
         onSelectCity={selectCity}
         onToggleUnits={toggleUnits}
-        onSetTheme={setTheme}
+        onCustomizeCards={handleCustomizeCards}
         onAskAi={handleAskAi}
         onToggleMap={handleToggleMap}
         onLocate={handleLocate}
@@ -546,8 +572,7 @@ export function AetherApp() {
         onOpenChange={setSettingsOpen}
         units={units}
         onSetUnits={setUnits}
-        theme={theme}
-        onSetTheme={setTheme}
+        onCustomizeCards={handleCustomizeCards}
       />
 
       {/* Full-screen Map mode overlay (client-only, lazy) */}

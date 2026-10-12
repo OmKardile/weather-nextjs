@@ -13,6 +13,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Additional languages / localization
 - Pluggable AI providers (bring your own key / endpoint)
 
+## [3.0.0] — 2026-10-12
+
+Following user feedback: the manual appearance control produced inconsistent
+colors/contrast, and the accent picker added options without adding value.
+Both are gone — the sky now owns the theme, full stop.
+
+### Removed
+- **Appearance setting (Auto / Light / Dark)** — the interface now *always*
+  follows the live sky at the selected city: dawn, day, dusk and night
+  re-skin every glass surface via the scene's natural surface mode. This
+  removes the entire class of forced-dark/forced-light contrast bugs (forced
+  dark over a bright day scene, forced light over a night scene, stale
+  overrides when switching cities across time zones). Settings shows a
+  read-only "Appearance — Follows the sky" row explaining the behavior; the
+  ⌘K palette's Appearance group is gone.
+- **Accent picker (Aurora / Sky / Sunset / Meadow)** — the aurora teal is the
+  brand; the four preset hue-shifts (≈85 lines of CSS variable overrides) are
+  deleted. `data-accent` no longer renders on the app root.
+- Persisted-preference migration: store version bumped to 3; retired `theme`
+  and `accent` keys are stripped from older localStorage state on rehydrate.
+
+### Fixed
+- **"Customize cards" now actually goes somewhere.** Entering edit mode from
+  Settings (desktop dialog or mobile tab) or ⌘K routes you to the cards:
+  desktop closes the dialog and smooth-scrolls the main column to the
+  forecast sections; mobile switches to the Today tab and expands the
+  forecast drawer to full (a snap-reset race on tab switch is now timed
+  after the reset). Previously the dialog closed (desktop) or nothing
+  visibly happened (mobile) — the edit UI lived in a place you were never
+  taken to.
+- **Card drag-and-drop inside the mobile forecast drawer** — the drag handles
+  and hide buttons now carry `data-vaul-no-drag` and stop pointerdown
+  propagation, so dnd-kit owns the gesture instead of the vaul sheet. Card
+  reordering, hiding and restoring verified working in both the desktop
+  column and the drawer.
+- Edit-mode toolbar gains a **Reset order** button (restores the default
+  section order) alongside Done.
+
+### Changed
+- **New brand mark — the "Altitude A".** A geometric A with a flowing wave
+  crossbar and a golden sun rising in its counter, on the aurora-teal
+  gradient squircle (replaces the sun-over-waves mark). Applied across the
+  inline `<LogoMark>`, favicon (`icon.svg`), Apple touch icon, PWA icons
+  (192 / 512 / maskable-512, re-rasterized), `public/logo.svg`, share-card
+  canvas art and the Open Graph image (now renders the exact SVG mark via a
+  data URI instead of a hand-drawn approximation).
+- Version bumped to 3.0.0 (settings sheet credits + package manifest).
+
 ## [2.0.1] — 2026-10-11
 
 ### Added

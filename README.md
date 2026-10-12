@@ -13,10 +13,10 @@ Aether is a ground-up rebuild of [OmKardile/weather-nextjs](https://github.com/O
 **macOS window layout**
 - Slim menu bar whose center morphs from city + live clock into a compact icon + temp + condition chip as the hero scrolls away (iOS Weather behavior)
 - Translucent cities sidebar (desktop) with live temperatures, weather icons and 12-hour temperature sparklines
-- **⌘K / Ctrl+K Spotlight command palette** — live city search, saved cities, actions, appearance switching and jump-to-section navigation, fully keyboard-driven
+- **⌘K / Ctrl+K Spotlight command palette** — live city search, saved cities, actions, card customization and jump-to-section navigation, fully keyboard-driven
 - AI inspector column (xl) / floating overlay (lg) / mobile tab — the same grounded chat panel in every breakpoint
 - Mobile: a floating glass dock (Today / Cities / Ask AI / Settings) plus a snap-point forecast drawer (peek / half / full) that lets the hero scroll behind it
-- Theme override: **Auto / Light / Dark**, persisted — Auto follows the scene's natural surface
+- Scene-driven theming: the interface follows the live sky at the selected city — dawn, day, dusk and night re-skin every glass surface (no manual dark mode to get wrong)
 
 **AI, grounded in your forecast** (server-side only, [details below](#ai-features))
 - **Briefing** — a streamed 2–3 sentence daily summary with the one practical takeaway
