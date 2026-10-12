@@ -5,6 +5,54 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.5.0] — 2026-10-12
+
+Rituals & rewards round: the Sun safety card gains an **outing planner**
+(pick a time, get your burn-time verdict), daily visits now build a
+**true streak** with a flame chip in the hero and two new badges, and
+the giant temperature readout **counts to its value** on every change.
+
+### Added
+- **Sun outing planner** (Sun safety card) — a half-hour-resolution
+  slider across the next 12 hours (UV linearly interpolated between the
+  hourly samples — the curve is the truth, interpolation never invents
+  peaks). The readout shows the chosen clock time with a relative hint
+  ("in 7.5 h"), the interpolated UV with its band color, unprotected and
+  SPF-30 burn estimates for the selected Fitzpatrick type, and a
+  plain-language protection verdict ("High — SPF 30, reapply after 2 h").
+  The UV curve itself gets an amber marker (line + dot + time label) that
+  follows the slider — and **tapping the curve picks the nearest slot**
+  (pointer convenience; the slider stays the accessible control, with a
+  descriptive `aria-label` and the verdict wired into the chart's screen
+  -reader summary).
+- **Visit streaks** — `streakFromDays`/`bestStreakFromDays` (pure,
+  DST-safe day-key arithmetic) derive the true consecutive-day streak
+  from the achievements store. The hero quick-stats row gains a **flame
+  chip** ("N day streak", amber ember that gains a glow at 7+ days,
+  hidden below 2 days), and the Settings badge-shelf hint now reads
+  "X of 10 earned · N-day streak (best M)".
+- **Two new achievements** — *Kindling* (three consecutive visit days,
+  new `flame` icon with a gentle CSS flicker) and *Globe-trotter* (ten
+  distinct cities viewed; the store now tracks a validated, capped
+  `cities` list, recorded by the achievements observer on every city
+  change).
+- `useCountUp` hook — eased (easeOutCubic) integer count-up used by the
+  hero temperature on city switches and unit toggles; tabular-nums keep
+  digit widths stable, interrupted animations resume from the last
+  painted frame, and `prefers-reduced-motion` snaps instantly (the snap
+  itself routes through a zero-duration rAF tick to respect the React
+  Compiler's no-setState-in-effect rule).
+
+### Changed
+- The Sun safety chart exposes its per-hour pixel stride so pointer
+  clicks invert cleanly to planner slots; the cursor is a crosshair over
+  the curve.
+- New `.outing-slider` token (globals.css): the ambient-slider recipe
+  in amber, full card width, with an 18px glowing thumb.
+- `days`-count "seven-day streak: X/7" shelf hint replaced by the real
+  streak numbers (consecutive ≠ distinct — the old line overcounted
+  gappy weeks).
+
 ## [3.4.0] — 2026-10-12
 
 Sun & honesty round: a **Sun safety** card personalizes burn-time

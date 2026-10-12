@@ -460,3 +460,58 @@
   border: 2px solid rgb(255 255 255 / 0.75);
   box-shadow: 0 1px 4px rgb(10 27 30 / 0.4);
 }
+
+/* ------------------------------------------------------------------ */
+/* Sun outing planner slider — same recipe, amber, full card width.    */
+/* The amber thumb echoes the marker on the UV curve above it.         */
+/* ------------------------------------------------------------------ */
+
+.outing-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #f5c97b var(--fill, 8%),
+    var(--surface-border) var(--fill, 8%)
+  );
+  cursor: pointer;
+}
+
+.outing-slider:focus-visible {
+  outline: 2px solid var(--surface-ring);
+  outline-offset: 4px;
+}
+
+.outing-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #f5c97b;
+  border: 2px solid rgb(255 255 255 / 0.85);
+  box-shadow:
+    0 0 12px -2px rgb(245 201 123 / 0.9),
+    0 1px 4px rgb(10 27 30 / 0.4);
+  transition: transform 150ms var(--ease-soft);
+}
+
+.outing-slider::-webkit-slider-thumb:hover,
+.outing-slider:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
+
+.outing-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #f5c97b;
+  border: 2px solid rgb(255 255 255 / 0.85);
+  box-shadow:
+    0 0 12px -2px rgb(245 201 123 / 0.9),
+    0 1px 4px rgb(10 27 30 / 0.4);
+}

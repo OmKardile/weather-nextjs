@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
-import type { JSX } from 'react';
-import { format, parseISO } from 'date-fns';
+import { useMemo, useState } from 'react';
+import type { CSSProperties, JSX } from 'react';
+import { addMinutes, format, parseISO } from 'date-fns';
 import { Icon } from '@/components/icons/Icon';
 import {
   AURORA_400,
@@ -25,7 +25,10 @@ import type { Units, WeatherBundle } from '@/types/weather';
 /* burn-time estimates: minutes ≈ MED × 2 / (3 × UV) — the ISO        */
 /* erythemal-dose arithmetic (UV index 1 ≈ 25 mJ/m²/min). SPF 30      */
 /* multiplies exposure time ~30×. A "low-UV window" line tells you    */
-/* when the index stays ≤ 3. Estimates, not a dermatologist.          */
+/* when the index stays ≤ 3. The outing planner answers "what about    */
+/* MY 14:00 walk?" — a slider (or a tap on the curve) picks a time    */
+/* in the next 12 h and gets a personalized burn-time verdict.        */
+/* Estimates, not a dermatologist.                                     */
 /* ================================================================== */
 
 interface SunSafetyCardProps {
@@ -83,6 +86,22 @@ function safeHour(iso: string, units: Units): string {
   }
 }
 
+/* ------------------------- Outing planner -------------------------- */
+
+/** Half-hour slots across the planning horizon (12 h → 25 slots). */
+const PLANNED_SLOTS = 24;
+const AMBER = '#F5C97B';
+
+/** Protection advice by UV band — plain language, no dermatology. */
+function verdictFor(uv: number): string {
+  if (uv < 0.1) return 'Sun is down — no protection needed.';
+  if (uv < 3) return 'Low — most skin is fine unprotected.';
+  if (uv < 6) return 'Moderate — hat and SPF 15 if you are fair.';
+  if (uv < 8) return 'High — SPF 30, reapply after 2 h.';
+  if (uv < 11) return 'Very high — plan shade breaks, SPF 30+.';
+  return 'Extreme — keep it short, stay in shade.';
+}
+
 export function SunSafetyCard({ bundle, units }: SunSafetyCardProps): JSX.Element {
   const [wrapRef, width] = useChartWidth<HTMLDivElement>();
   const motionOk = useMotionOk();
@@ -100,13 +119,62 @@ export function SunSafetyCard({ bundle, units }: SunSafetyCardProps): JSX.Elemen
     [hours],
   );
 
+  // Outing planner state — which half-hour slot is being evaluated.
+  // Default: one hour ahead. Ephemeral by design (outings are ad hoc).
+  const [slotIdx, setSlotIdx] = useState(2);
+
+  // Slot model: half-hour steps over the next 12 h, UV linearly
+  // interpolated between the hourly samples (the curve is the truth —
+  // interpolation only reads it, never invents peaks).
+  const planner = useMemo(() => {
+    if (hours.length < 2) return null;
+    let start: Date;
+    try {
+      start = parseISO(hours[0].time);
+    } catch {
+      return null;
+    }
+    const slotCount = Math.min(PLANNED_SLOTS + 1, (hours.length - 1) * 2 + 1);
+    const uvAt = (slot: number): number => {
+      const h = slot / 2;
+      const lo = Math.floor(h);
+      const hi = Math.min(Math.ceil(h), hours.length - 1);
+      const frac = h - lo;
+      return hours[lo].uvIndex + (hours[hi].uvIndex - hours[lo].uvIndex) * frac;
+    };
+    return { start, slotCount, uvAt };
+  }, [hours]);
+
+  const slot = planner ? Math.min(slotIdx, planner.slotCount - 1) : 0;
+  const slotUv = planner ? planner.uvAt(slot) : 0;
+  const slotInfo = uvInfo(slotUv);
+  const slotBurn = burnMinutes(slotUv, skinType);
+
+  const slotTimeLabel = useMemo(() => {
+    if (!planner) return '';
+    try {
+      return format(addMinutes(planner.start, slot * 30), units === 'metric' ? 'HH:mm' : 'h:mm a');
+    } catch {
+      return '--:--';
+    }
+  }, [planner, slot, units]);
+
+  const slotRelative = (() => {
+    const mins = slot * 30;
+    if (mins === 0) return 'now';
+    if (mins < 60) return `in ${mins} min`;
+    return mins % 60 === 0 ? `in ${mins / 60} h` : `in ${(mins / 60).toFixed(1)} h`;
+  })();
+
   // Geometry: band-colored gradient stops, smooth curve, now + peak markers.
+  // (hourStep is the per-hour pixel stride — exposed so pointer clicks on
+  // the curve can be inverted back to a planner slot.)
   const geom = useMemo(() => {
     if (hours.length < 2 || width < 60) return null;
     const n = hours.length;
     const padX = 8;
-    const slot = (width - padX * 2) / (n - 1);
-    const xs = hours.map((_, i) => f(padX + slot * i));
+    const hourStep = (width - padX * 2) / (n - 1);
+    const xs = hours.map((_, i) => f(padX + hourStep * i));
     const ys = hours.map((h) => f(BASE - (clamp(h.uvIndex, 0, UV_MAX) / UV_MAX) * (BASE - TOP)));
     const pts = xs.map((x, i) => ({ x, y: ys[i] }));
 
@@ -127,10 +195,25 @@ export function SunSafetyCard({ bundle, units }: SunSafetyCardProps): JSX.Elemen
     const peakIdx = hours.findIndex((h) => h === peak);
     const peakPt = peakIdx >= 0 ? pts[peakIdx] : null;
 
-    return { xs, pts, line, area, stops, nowX, nowY, peakPt };
+    return { xs, pts, line, area, stops, nowX, nowY, peakPt, padX, hourStep };
   }, [hours, width, peak]);
 
   const safeGeom = geom && hours.length === geom.pts.length ? geom : null;
+
+  // Outing marker on the curve — interpolated between hourly points.
+  const outingPt = (() => {
+    if (!safeGeom || !planner) return null;
+    const h = slot / 2;
+    const lo = Math.floor(h);
+    const hi = Math.min(Math.ceil(h), safeGeom.pts.length - 1);
+    const frac = h - lo;
+    const a = safeGeom.pts[lo];
+    const b = safeGeom.pts[hi];
+    return {
+      x: a.x + (b.x - a.x) * frac,
+      y: a.y + (b.y - a.y) * frac,
+    };
+  })();
 
   // Low-UV window: the last hour before the index first crosses 3 upward,
   // and the first hour after it last crosses back down.
@@ -158,7 +241,7 @@ export function SunSafetyCard({ bundle, units }: SunSafetyCardProps): JSX.Elemen
   const nowInfo = uvInfo(uvNow);
   const peakInfo = uvInfo(peak.uvIndex);
 
-  const ariaSummary = `Sun safety: UV index ${uvNow.toFixed(1)} now (${nowInfo.label}), peaking at ${peak.uvIndex.toFixed(1)} (${peakInfo.label}) around ${safeHour(peak.time, units)}. For skin type ${skinType} (${SKIN_LABELS[skinType].split('·')[1].trim()}), unprotected skin may redden in about ${formatMinutes(nowBurn)} now and ${formatMinutes(peakBurn)} at the peak; SPF 30 extends that roughly thirty-fold.${windows?.kind === 'crosses' ? ` UV stays low before ${safeHour(windows.morning, units)} and after ${safeHour(windows.evening, units)}.` : ' UV stays low for the whole window.'}`;
+  const ariaSummary = `Sun safety: UV index ${uvNow.toFixed(1)} now (${nowInfo.label}), peaking at ${peak.uvIndex.toFixed(1)} (${peakInfo.label}) around ${safeHour(peak.time, units)}. For skin type ${skinType} (${SKIN_LABELS[skinType].split('·')[1].trim()}), unprotected skin may redden in about ${formatMinutes(nowBurn)} now and ${formatMinutes(peakBurn)} at the peak; SPF 30 extends that roughly thirty-fold.${windows?.kind === 'crosses' ? ` UV stays low before ${safeHour(windows.morning, units)} and after ${safeHour(windows.evening, units)}.` : ' UV stays low for the whole window.'}${planner ? ` Outing planner: at ${slotTimeLabel} (${slotRelative}) UV is ${slotUv.toFixed(1)}, ${verdictFor(slotUv)}` : ''}`;
 
   return (
     <div className="glass card-lift fs-card rounded-[var(--radius-card)] p-4 shadow-[var(--shadow-glass)] sm:p-5">
@@ -181,15 +264,24 @@ export function SunSafetyCard({ bundle, units }: SunSafetyCardProps): JSX.Elemen
         <span className="hidden card-label-muted shrink-0 sm:block">Exposure</span>
       </div>
 
-      {/* UV curve — band-colored gradient area */}
+      {/* UV curve — band-colored gradient area. Clicking the curve picks a
+          planner slot (pointer convenience; the slider is the a11y path). */}
       <div ref={wrapRef} className="mt-3">
         {safeGeom ? (
           <svg
             width={width}
             height={CHART_H}
-            className="block"
+            className="block cursor-crosshair"
             role="img"
             aria-label={ariaSummary}
+            onClick={(event) => {
+              if (!planner) return;
+              const rect = event.currentTarget.getBoundingClientRect();
+              const x = event.clientX - rect.left;
+              const hourFrac = (x - safeGeom.padX) / safeGeom.hourStep;
+              const next = clamp(Math.round(hourFrac * 2), 0, planner.slotCount - 1);
+              setSlotIdx(next);
+            }}
           >
             <defs>
               <linearGradient id="aether-uv-area" x1="0" y1="0" x2="1" y2="0">
@@ -251,6 +343,40 @@ export function SunSafetyCard({ bundle, units }: SunSafetyCardProps): JSX.Elemen
             />
             <circle cx={safeGeom.nowX} cy={safeGeom.nowY} r={3} fill={AURORA_400} />
             <circle cx={safeGeom.nowX} cy={safeGeom.nowY} r={6.5} fill={AURORA_400} opacity={0.25} />
+
+            {/* outing-planner marker — amber, follows the slider/click */}
+            {outingPt ? (
+              <g>
+                <line
+                  x1={outingPt.x}
+                  x2={outingPt.x}
+                  y1={Math.max(14, outingPt.y - 22)}
+                  y2={BASE}
+                  stroke={AMBER}
+                  strokeWidth={1.4}
+                  opacity={0.85}
+                />
+                <circle
+                  cx={outingPt.x}
+                  cy={outingPt.y}
+                  r={4}
+                  fill={AMBER}
+                  stroke="rgb(255 255 255 / 0.9)"
+                  strokeWidth={1.4}
+                />
+                <circle cx={outingPt.x} cy={outingPt.y} r={8} fill={AMBER} opacity={0.22} />
+                <text
+                  x={clamp(outingPt.x, 26, width - 26)}
+                  y={Math.max(10, outingPt.y - 26)}
+                  textAnchor="middle"
+                  fontSize={9}
+                  className="tnum font-semibold"
+                  style={{ fill: AMBER }}
+                >
+                  {slotTimeLabel}
+                </text>
+              </g>
+            ) : null}
 
             {/* peak marker */}
             {safeGeom.peakPt && safeGeom.peakPt !== safeGeom.pts[0] ? (
@@ -369,6 +495,48 @@ export function SunSafetyCard({ bundle, units }: SunSafetyCardProps): JSX.Elemen
           </p>
         </div>
       </div>
+
+      {/* Outing planner — pick a time, get the verdict for YOUR skin */}
+      {planner ? (
+        <div className="glass-subtle mt-4 rounded-2xl px-3.5 py-3">
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <p className="text-[11px] font-medium text-surface-muted">
+              Outing planner{' '}
+              <span className="font-normal text-surface-faint">· next 12 h · tap the curve</span>
+            </p>
+            <p className="tnum text-[11px] font-semibold" style={{ color: slotInfo.color }}>
+              UV {slotUv.toFixed(1)} {slotInfo.label.toLowerCase()}
+            </p>
+          </div>
+
+          <input
+            type="range"
+            min={0}
+            max={planner.slotCount - 1}
+            step={1}
+            value={slot}
+            onChange={(event) => setSlotIdx(Number(event.target.value))}
+            className="outing-slider mt-2.5"
+            style={{ '--fill': `${(slot / (planner.slotCount - 1)) * 100}%` } as CSSProperties}
+            aria-label={`Planned outing time — currently ${slotTimeLabel}, ${slotRelative}`}
+          />
+
+          <div className="mt-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <p className="tnum text-sm font-bold text-surface">
+              {slotTimeLabel}{' '}
+              <span className="font-normal text-surface-faint">{slotRelative}</span>
+            </p>
+            <p className="text-[11px] font-medium" style={{ color: slotInfo.color }}>
+              {verdictFor(slotUv)}
+            </p>
+          </div>
+          <p className="tnum mt-1 text-[10px] text-surface-faint">
+            {slotBurn != null
+              ? `Unprotected ≈ ${formatMinutes(slotBurn)} · SPF 30 ≈ ${formatMinutes(slotBurn * 30)}`
+              : 'No erythemal UV at this time — no burn risk.'}
+          </p>
+        </div>
+      ) : null}
 
       <p className="mt-3 text-[10px] leading-relaxed text-surface-faint">
         {windows?.kind === 'crosses' ? (

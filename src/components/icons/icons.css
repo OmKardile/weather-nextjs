@@ -409,6 +409,30 @@
   animation: ic-shimmer 2.8s linear infinite;
 }
 
+/* flame — gentle flicker (scale + slight sway), infinite */
+.ic-flame {
+  transform-box: fill-box;
+  transform-origin: 50% 90%;
+}
+@keyframes ic-flame-flicker {
+  0%,
+  100% {
+    transform: scaleY(1) scaleX(1);
+  }
+  25% {
+    transform: scaleY(1.06) scaleX(0.97);
+  }
+  50% {
+    transform: scaleY(0.96) scaleX(1.03);
+  }
+  75% {
+    transform: scaleY(1.04) scaleX(0.99);
+  }
+}
+.ic-anim .ic-flame {
+  animation: ic-flame-flicker 2.4s ease-in-out infinite;
+}
+
 /* ==================== reduced motion ==================== */
 @media (prefers-reduced-motion: reduce) {
   .ic-anim,

@@ -5,6 +5,7 @@ import {
   Bookmark,
   BookmarkCheck,
   Droplets,
+  Flame,
   Minus,
   RefreshCw,
   Sunrise,
@@ -16,6 +17,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { WeatherIcon } from '@/components/weather/WeatherIcon';
 import { ShareCardButton } from '@/components/weather/ShareCardButton';
 import { LiquidGlass } from '@/components/glass/LiquidGlass';
+import { useAchievements } from '@/hooks/use-achievements';
+import { useCountUp } from '@/hooks/use-count-up';
+import { streakFromDays } from '@/lib/achievements';
 import { formatLocalClock, formatLocalDate } from '@/lib/time';
 import {
   compassPoint,
@@ -113,6 +117,24 @@ function YesterdayChip({
   );
 }
 
+/** Visit-streak quick stat — a warm ember for consecutive daily visits (≥2). */
+function StreakChip({ streak }: { streak: number }) {
+  if (streak < 2) return null;
+  const glow = streak >= 7;
+  return (
+    <StatChip
+      icon={<Flame className="h-4 w-4" />}
+      iconClassName={
+        glow
+          ? 'text-amber-300 drop-shadow-[0_0_6px_rgb(251_191_36/0.8)]'
+          : 'text-amber-300/90'
+      }
+      label="day streak"
+      value={`${streak}`}
+    />
+  );
+}
+
 export function CurrentWeather({
   city,
   data,
@@ -125,6 +147,11 @@ export function CurrentWeather({
   const { current, daily, hourly, yesterday, utcOffsetSeconds } = data;
   const today = daily[0];
   const label = conditionLabel(current.weatherCode);
+
+  // Visit streak (achievements store — hydration-safe: the server snapshot
+  // is empty, so the chip only appears after mount-effect hydration).
+  const { days } = useAchievements();
+  const streak = useMemo(() => streakFromDays(days), [days]);
 
   // Live wall-clock for the location, ticking twice a minute.
   const [tick, setTick] = useState(0);
@@ -147,6 +174,9 @@ export function CurrentWeather({
   })();
 
   const tempValue = displayTemp(current.temperature, units);
+  // The giant readout counts to its new value (city switch, refresh) —
+  // eased, tabular-nums so digits never shift width.
+  const animatedTemp = useCountUp(tempValue);
 
   return (
     <section
@@ -212,7 +242,7 @@ export function CurrentWeather({
             className="text-on-scene tnum flex items-start leading-[0.95] tracking-[-0.045em]"
             style={{ fontSize: 'clamp(104px, 24vw, 176px)', fontWeight: 200 }}
           >
-            {tempValue}
+            {animatedTemp}
             <span
               aria-hidden="true"
               className="mt-[0.09em] ml-[0.02em]"
@@ -264,6 +294,7 @@ export function CurrentWeather({
           />
         )}
         <YesterdayChip today={today} yesterday={yesterday} units={units} />
+        <StreakChip streak={streak} />
       </div>
 
       <p className="text-on-scene-3 tnum mt-5 text-[12px]">

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 
 import { Icon } from '@/components/icons/Icon';
 import { toast } from '@/hooks/use-toast';
@@ -9,6 +9,8 @@ import {
   getAchievementServerSnapshot,
   getAchievementSnapshot,
   hydrateAchievements,
+  recordCityView,
+  streakFromDays,
   subscribeAchievements,
   unlockAchievement,
 } from '@/lib/achievements';
@@ -44,17 +46,26 @@ interface ObserverInputs {
   savedCount: number;
   /** Whether the map overlay is open. */
   mapOpen: boolean;
+  /** Id of the city whose weather is on screen (null on the welcome state). */
+  cityId: number | null;
 }
 
 export function useAchievementObserver({
   condition,
   savedCount,
   mapOpen,
+  cityId,
 }: ObserverInputs): void {
   // Hydrate from localStorage exactly once, after mount.
   useEffect(() => {
     hydrateAchievements();
   }, []);
+
+  // Globe-trotter tracking: distinct viewed cities (external-store write
+  // from an effect — the observable pattern, never React setState).
+  useEffect(() => {
+    if (cityId != null) recordCityView(cityId);
+  }, [cityId]);
 
   const tryUnlock = useCallback((id: string) => {
     const def = unlockAchievement(id);
@@ -98,10 +109,18 @@ export function useAchievementObserver({
   }, [tryUnlock]);
 
   // week-streak: distinct tracked days (hydrate adds today first).
-  const { days } = useAchievements();
+  // streak-3: three CONSECUTIVE visit days (true streak, not distinct count).
+  const { days, cities } = useAchievements();
+  const visitStreak = useMemo(() => streakFromDays(days), [days]);
   useEffect(() => {
     if (days.length >= 7) tryUnlock('week-streak');
   }, [days.length, tryUnlock]);
+  useEffect(() => {
+    if (visitStreak >= 3) tryUnlock('streak-3');
+  }, [visitStreak, tryUnlock]);
+  useEffect(() => {
+    if (cities.length >= 10) tryUnlock('city-explorer');
+  }, [cities.length, tryUnlock]);
 
   // Impulsive signals: sky section viewed at night / share card used.
   useEffect(() => {

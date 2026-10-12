@@ -13,7 +13,7 @@ import type { Density } from '@/hooks/use-preferences';
 import { requestTiltPermission } from '@/hooks/use-tilt-glow';
 import { toggleAmbientSound } from '@/hooks/use-ambient-sound';
 import { useAchievements } from '@/hooks/use-achievements';
-import { ACHIEVEMENTS } from '@/lib/achievements';
+import { ACHIEVEMENTS, bestStreakFromDays, streakFromDays } from '@/lib/achievements';
 import { SECTION_TITLES } from '@/lib/sections';
 import type { SectionId } from '@/lib/sections';
 import { AI_VOICE_OPTIONS } from '@/types/ai';
@@ -357,13 +357,15 @@ function BadgeShelf(): JSX.Element {
   const { unlocked, days } = useAchievements();
 
   const unlockedSet = new Set(hydrated ? unlocked : []);
-  const dayCount = hydrated ? days.length : 0;
+  const streak = hydrated ? streakFromDays(days) : 0;
+  const best = hydrated ? bestStreakFromDays(days) : 0;
 
   return (
     <div className="py-3.5">
       <p className="text-sm font-semibold text-surface">Badge shelf</p>
-      <p className="mt-0.5 text-xs text-surface-faint">
-        {unlockedSet.size} of {ACHIEVEMENTS.length} earned · seven-day streak: {Math.min(dayCount, 7)}/7
+      <p className="tnum mt-0.5 text-xs text-surface-faint">
+        {unlockedSet.size} of {ACHIEVEMENTS.length} earned ·{' '}
+        {streak > 0 ? `${streak}-day streak (best ${best})` : `best streak ${best} day${best === 1 ? '' : 's'}`}
       </p>
       <div className="mt-3 grid grid-cols-2 gap-2">
         {ACHIEVEMENTS.map((achievement) => {
@@ -513,7 +515,7 @@ export function SettingsContent({
 
       <div className="py-3.5">
         <p className="text-xs leading-relaxed text-surface-faint">
-          Aether 3.4.0 · forecast &amp; air quality by Open-Meteo (CAMS) · geocoding by
+          Aether 3.5.0 · forecast &amp; air quality by Open-Meteo (CAMS) · geocoding by
           Open-Meteo &amp; Nominatim · AI by Gemini
         </p>
       </div>
