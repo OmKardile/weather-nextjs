@@ -433,6 +433,24 @@
   animation: ic-flame-flicker 2.4s ease-in-out infinite;
 }
 
+/* Leaf — a gentle breeze sway (fresh-air badge glyph). */
+.ic-leaf {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+}
+@keyframes ic-leaf-sway {
+  0%,
+  100% {
+    transform: rotate(-4deg) scaleY(1);
+  }
+  50% {
+    transform: rotate(5deg) scaleY(1.04);
+  }
+}
+.ic-anim .ic-leaf {
+  animation: ic-leaf-sway 3.6s ease-in-out infinite;
+}
+
 /* ==================== reduced motion ==================== */
 @media (prefers-reduced-motion: reduce) {
   .ic-anim,

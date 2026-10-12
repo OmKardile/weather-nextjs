@@ -418,7 +418,7 @@ export function ForecastSections({ city, bundle, units }: ForecastSectionsProps)
             <>
               <MetricGrid data={bundle} units={units} city={city} />
               <div className="fs-stack mt-4">
-                <SunSafetyCard bundle={bundle} units={units} />
+                <SunSafetyCard city={city} bundle={bundle} units={units} />
               </div>
               <div className="fs-stack mt-4 sm:max-w-sm">
                 <MoonPhaseCard bundle={bundle} />

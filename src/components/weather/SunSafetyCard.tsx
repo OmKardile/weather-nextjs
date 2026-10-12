@@ -15,7 +15,7 @@ import { usePreferences } from '@/hooks/use-preferences';
 import type { SkinType } from '@/hooks/use-preferences';
 import { useToast } from '@/hooks/use-toast';
 import { uvInfo } from '@/lib/units';
-import type { Units, WeatherBundle } from '@/types/weather';
+import type { City, Units, WeatherBundle } from '@/types/weather';
 
 /* ================================================================== */
 /* SunSafetyCard — when the sun demands respect.                        */
@@ -33,6 +33,7 @@ import type { Units, WeatherBundle } from '@/types/weather';
 /* ================================================================== */
 
 interface SunSafetyCardProps {
+  city: City;
   bundle: WeatherBundle;
   units: Units;
 }
@@ -103,7 +104,7 @@ function verdictFor(uv: number): string {
   return 'Extreme — keep it short, stay in shade.';
 }
 
-export function SunSafetyCard({ bundle, units }: SunSafetyCardProps): JSX.Element {
+export function SunSafetyCard({ city, bundle, units }: SunSafetyCardProps): JSX.Element {
   const [wrapRef, width] = useChartWidth<HTMLDivElement>();
   const motionOk = useMotionOk();
   const skinType = usePreferences((state) => state.skinType);
@@ -167,6 +168,40 @@ export function SunSafetyCard({ bundle, units }: SunSafetyCardProps): JSX.Elemen
     if (mins < 60) return `in ${mins} min`;
     return mins % 60 === 0 ? `in ${mins / 60} h` : `in ${(mins / 60).toFixed(1)} h`;
   })();
+
+  /* Share the planner verdict — a compact text card (no canvas needed for
+     a verdict). navigator.share with a clipboard fallback. */
+  const handleShareVerdict = useCallback(async () => {
+    const burn =
+      slotBurn != null
+        ? `Unprotected ≈ ${formatMinutes(slotBurn)} · SPF 30 ≈ ${formatMinutes(slotBurn * 30)}`
+        : 'No erythemal UV at this time — no burn risk.';
+    const text =
+      `Aether sun check — ${city.name}\n` +
+      `${slotTimeLabel} (${slotRelative}) · UV ${slotUv.toFixed(1)} ${slotInfo.label.toLowerCase()}\n` +
+      `${verdictFor(slotUv)}\n${burn}`;
+    try {
+      const nav = navigator as Navigator & { share?: (data: ShareData) => Promise<void> };
+      if (nav.share) {
+        await nav.share({ title: 'Aether sun check', text });
+        toast({ title: 'Shared', description: 'Verdict handed to your share sheet.' });
+        return;
+      }
+      await navigator.clipboard.writeText(text);
+      toast({
+        title: 'Copied to clipboard',
+        description: 'Paste the sun verdict anywhere.',
+      });
+    } catch (error) {
+      // A dismissed share sheet is not an error — stay quiet. A failed
+      // clipboard copy (permissions / old browser) deserves feedback.
+      if (error instanceof DOMException && error.name === 'AbortError') return;
+      toast({
+        title: 'Could not share',
+        description: 'Your browser blocked the clipboard — the verdict is in the card.',
+      });
+    }
+  }, [slotBurn, slotUv, slotInfo, slotTimeLabel, slotRelative, city.name, toast]);
 
   // Geometry: band-colored gradient stops, smooth curve, now + peak markers.
   // (hourStep is the per-hour pixel stride — exposed so pointer clicks on
@@ -501,14 +536,25 @@ export function SunSafetyCard({ bundle, units }: SunSafetyCardProps): JSX.Elemen
       {/* Outing planner — pick a time, get the verdict for YOUR skin */}
       {planner ? (
         <div className="glass-subtle mt-4 rounded-2xl px-3.5 py-3">
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <p className="text-[11px] font-medium text-surface-muted">
               Outing planner{' '}
               <span className="font-normal text-surface-faint">· next 12 h · tap the curve</span>
             </p>
-            <p className="tnum text-[11px] font-semibold" style={{ color: slotInfo.color }}>
-              UV {slotUv.toFixed(1)} {slotInfo.label.toLowerCase()}
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="tnum text-[11px] font-semibold" style={{ color: slotInfo.color }}>
+                UV {slotUv.toFixed(1)} {slotInfo.label.toLowerCase()}
+              </p>
+              <button
+                type="button"
+                onClick={() => void handleShareVerdict()}
+                aria-label="Share this outing verdict"
+                title="Share verdict"
+                className="focus-ring glass-hover flex h-6 w-6 items-center justify-center rounded-full text-surface-muted transition-all duration-200 hover:text-surface active:scale-90"
+              >
+                <Icon name="send" size={12} strokeWidth={2} aria-hidden="true" />
+              </button>
+            </div>
           </div>
 
           <input

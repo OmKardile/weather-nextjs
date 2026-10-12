@@ -403,6 +403,62 @@ function HistoricalChart({
           );
         })}
 
+        {/* warmest / coldest year rings — visual parity with the aria
+            summary (which announces both); the dot gains a dashed halo
+            and a tiny tag so sighted readers see the extremes too. */}
+        {(() => {
+          if (!geom) return null;
+          const extremes: Array<{
+            year: HistoricalYear | null;
+            key: string;
+            color: string;
+            label: string;
+            below: boolean;
+          }> = [
+            { year: warmest, key: 'warmest', color: WARM, label: 'warmest', below: false },
+            { year: coldest, key: 'coldest', color: COOL, label: 'coldest', below: true },
+          ];
+          return extremes.map(({ year, key, color, label, below }) => {
+            if (!year || year.tmax == null) return null;
+            const idx = years.findIndex((y) => y.year === year.year);
+            if (idx < 0) return null;
+            const x = geom.xOf(idx);
+            const y = below
+              ? year.tmin != null
+                ? geom.yOf(year.tmin)
+                : null
+              : geom.yOf(year.tmax);
+            if (y == null) return null;
+            const labelY = below
+              ? Math.min(y + 18, height - CHART_BOTTOM - 2)
+              : Math.max(y - 11, CHART_TOP + 7);
+            return (
+              <g key={key} aria-hidden="true">
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={7.5}
+                  fill="none"
+                  stroke={color}
+                  strokeWidth={1}
+                  strokeDasharray="2 3"
+                  opacity={0.75}
+                />
+                <text
+                  x={clamp(x, 26, width - LABEL_W - 26)}
+                  y={labelY}
+                  textAnchor="middle"
+                  fontSize={8}
+                  className="tnum font-semibold"
+                  style={{ fill: color, opacity: 0.9 }}
+                >
+                  {label} ’{String(year.year).slice(2)}
+                </text>
+              </g>
+            );
+          });
+        })()}
+
         {/* year ticks */}
         {ticks.map((i) => (
           <text

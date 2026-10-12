@@ -1,8 +1,8 @@
 'use client';
 
-import { Droplets } from 'lucide-react';
+import { Droplets, Sun } from 'lucide-react';
 import { WeatherIcon } from '@/components/weather/WeatherIcon';
-import { formatHour, formatTemp } from '@/lib/units';
+import { formatHour, formatTemp, uvInfo } from '@/lib/units';
 import type { HourlyPoint, Units } from '@/types/weather';
 import { cn } from '@/lib/utils';
 
@@ -43,11 +43,15 @@ export function HourlyStrip({ hours, units, goldenWindows = [] }: HourlyStripPro
       {hours.map((hour, index) => {
         const isNow = index === 0;
         const golden = goldenWindows.find((w) => inWindow(hour.time, w));
+        // Burn-risk hour: UV ≥ 6 (the "High" band floor — when unprotected
+        // skin starts reddening in well under an hour for most types).
+        const uv = uvInfo(hour.uvIndex);
+        const burnRisk = hour.uvIndex >= 6;
         return (
           <div
             key={hour.time}
             role="listitem"
-            aria-label={`${formatHour(hour.time, units)}, ${formatTemp(hour.temperature, units)}, ${hour.precipitationProbability}% precipitation chance${golden ? ', golden hour' : ''}`}
+            aria-label={`${formatHour(hour.time, units)}, ${formatTemp(hour.temperature, units)}, ${hour.precipitationProbability}% precipitation chance${golden ? ', golden hour' : ''}${burnRisk ? `, UV ${hour.uvIndex} ${uv.label.toLowerCase()}` : ''}`}
             title={golden ? 'Golden hour' : undefined}
             className={cn(
               'glass-subtle relative flex w-[74px] shrink-0 snap-start flex-col items-center gap-1.5 overflow-hidden rounded-2xl px-2 py-3 transition-shadow duration-300 sm:w-[80px]',
@@ -82,6 +86,22 @@ export function HourlyStrip({ hours, units, goldenWindows = [] }: HourlyStripPro
             <span className={cn('tnum relative text-sm font-semibold', isNow && 'text-[15px] font-bold')}>
               {formatTemp(hour.temperature, units)}
             </span>
+            {/* Burn-risk row — only on UV ≥ 6 hours, band-colored so the
+                severity reads at a glance (echoes the Sun safety palette). */}
+            {burnRisk ? (
+              <span
+                className="tnum relative flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-bold"
+                style={{
+                  color: uv.color,
+                  background: 'rgb(255 255 255 / 0.08)',
+                  boxShadow: `0 0 10px -4px ${uv.color}`,
+                }}
+                title={`UV ${hour.uvIndex} — ${uv.label.toLowerCase()} burn risk`}
+              >
+                <Sun className="h-2.5 w-2.5" aria-hidden="true" />
+                {Math.round(hour.uvIndex)}
+              </span>
+            ) : null}
             <span
               className={cn(
                 'tnum relative flex items-center gap-0.5 text-[10px]',

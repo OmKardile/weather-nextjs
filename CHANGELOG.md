@@ -5,6 +5,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] — 2026-10-12
+
+Climate lens round: the Time machine grows a **30-year climate trend**
+(regression band + per-decade verdict + warmest/coldest markers), the badge
+shelf welcomes its **eleventh badge** (Fresh air — clean-air days), the
+outing verdict can be **shared** with one tap, and high-UV hours now carry
+**burn-risk chips** in the hourly strip. Two real bugs fixed on the way:
+a conditional-hook crash in the Time machine chart and dock-label legibility
+at Ultra-clear glass.
+
+### Added
+- **30-year climate trend** (Time machine) — an OLS regression over the
+  year-by-year highs renders as a solid trend line with a soft ±1σ band
+  behind the dots, plus a verdict chip ("+0.6°/decade · this date is
+  warming over 31 years · typical spread ±2.6°"). **Warmest and coldest
+  years** now carry dashed ring highlights with tiny year tags — visual
+  parity with the screen-reader summary that always announced them.
+  Null-guarded below 8 archive years (a shorter window would make
+  "per decade" wording misleading).
+- **Fresh air badge** (achievements) — unlocks when the displayed city's
+  European AQI is 20 or better on a day you check it. New `leaf` icon
+  glyph with a gentle breeze sway (reduced-motion safe). The shelf now
+  reads "N of 11 earned".
+- **Share outing verdict** (Sun safety card) — a send button in the outing
+  planner header shares a compact text verdict (time, UV with band,
+  protection verdict, unprotected/SPF-30 burn estimates) via the share
+  sheet with a clipboard fallback; a blocked clipboard gets honest
+  feedback instead of silence.
+- **Burn-risk chips** (hourly strip) — hours with UV ≥ 6 (the "high" band
+  floor) show a band-colored sun pill with the rounded UV index; severity
+  reads at a glance in the same palette as the Sun safety curve. Aria
+  labels include the UV reading.
+
+### Fixed
+- **Conditional hook crash** in the Time machine chart — the in-flight
+  climate-trend work from an interrupted session placed `trendGeom`'s
+  useMemo after an early return (React rules-of-hooks violation, lint
+  error + a live hooks-order warning on reload). Moved above the guard;
+  its own `!trend || !geom` null path keeps semantics identical.
+- **Dock-label legibility at Ultra-clear glass** — scrolled drawer/map
+  content fighting the floating dock's tab labels at the default
+  transparency setting. New `.dock-content-scrim` between the content
+  (z-30) and the capsule (z-40) — an iOS-tab-bar-style gradient that
+  tones with light/dark scenes and only softens (never removes) under
+  Reduce bright effects.
+
+### Changed
+- Hourly strip aria labels now append golden-hour and UV context in one
+  pass; burn chips equalize chip heights via the existing flex stretch.
+
 ## [3.5.0] — 2026-10-12
 
 Rituals & rewards round: the Sun safety card gains an **outing planner**
