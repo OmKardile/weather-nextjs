@@ -138,7 +138,7 @@ export function AdvisorCards({ city, units, className }: AdvisorCardsProps): JSX
           <Glass level="base" className="rounded-2xl p-4 sm:p-5">
             <div className="flex items-center gap-2">
               <Icon name="thermometer" size={16} className="text-surface-muted" />
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+              <p className="card-label">
                 What to wear
               </p>
             </div>

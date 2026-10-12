@@ -494,7 +494,7 @@ function MetricDetailBody({
                 ] as const
               ).map(([label, value]) => (
                 <div key={label} className="glass-subtle rounded-2xl px-3 py-2.5 text-center">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-faint">
+                  <p className="card-label-muted">
                     {label}
                   </p>
                   <p className="tnum mt-0.5 text-sm font-semibold text-surface">
@@ -568,7 +568,7 @@ export function ExpandableCard({
             type="button"
             className="focus-ring group flex w-full items-center gap-1.5 rounded-lg text-left"
           >
-            <span className="flex w-full items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+            <span className="flex w-full items-center gap-1.5 card-label">
               <span aria-hidden="true">{icon}</span>
               {label}
             </span>
@@ -597,7 +597,7 @@ export function ExpandableCard({
         >
           <div className="flex items-center justify-between gap-3 px-5 pb-2 pt-4 sm:px-6 sm:pt-5">
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+              <p className="card-label">
                 {label}
               </p>
               <h2 className="truncate font-display text-xl font-bold tracking-tight text-surface">

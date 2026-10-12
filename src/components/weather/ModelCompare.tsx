@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent } from 'react';
 import type { UseQueryResult } from '@tanstack/react-query';
 import { Icon } from '@/components/icons/Icon';
+import { SegmentedControl } from '@/components/glass/SegmentedControl';
 import { formatPrecip, formatTemp, formatWeekday } from '@/lib/units';
 import { cn } from '@/lib/utils';
 import { AURORA_400, AURORA_300, clamp, f, smoothPath, useChartWidth } from '@/components/weather/chart-helpers';
@@ -199,7 +200,7 @@ export function ModelCompare({ units, query }: ModelCompareProps) {
   if (query.isPending && !models) {
     return (
       <div className="glass rounded-[var(--radius-card)] p-5" aria-busy="true">
-        <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+        <p className="flex items-center gap-1.5 card-label">
           <Icon name="layers" size={14} strokeWidth={2} />
           Model comparison
         </p>
@@ -231,35 +232,19 @@ export function ModelCompare({ units, query }: ModelCompareProps) {
   return (
     <div className="glass animate-fade-up flex h-full flex-col rounded-[var(--radius-card)] p-4 shadow-[var(--shadow-glass)] sm:p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+        <p className="flex items-center gap-1.5 card-label">
           <Icon name="layers" size={14} strokeWidth={2} aria-hidden="true" />
           Model comparison
         </p>
-        <div
-          role="group"
+        <SegmentedControl
           aria-label="Model metric"
-          className="glass-subtle flex h-8 items-center rounded-full p-0.5"
-        >
-          {(['temp', 'precip'] as const).map((option) => {
-            const isActive = metric === option;
-            return (
-              <button
-                key={option}
-                type="button"
-                aria-pressed={isActive}
-                onClick={isActive ? undefined : () => setMetric(option)}
-                className={cn(
-                  'focus-ring h-7 rounded-full px-3 text-xs font-semibold transition-all duration-200',
-                  isActive
-                    ? 'bg-aurora-500 text-[#04211C] shadow-[0_0_14px_-4px_rgb(34_188_160/0.8)]'
-                    : 'text-surface-muted hover:text-surface',
-                )}
-              >
-                {option === 'temp' ? 'Temp' : 'Precip'}
-              </button>
-            );
-          })}
-        </div>
+          options={[
+            { id: 'temp' as Metric, label: 'Temp' },
+            { id: 'precip' as Metric, label: 'Precip' },
+          ]}
+          value={metric}
+          onChange={setMetric}
+        />
       </div>
 
       {/* Legend chips */}

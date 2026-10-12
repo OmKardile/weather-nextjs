@@ -35,7 +35,7 @@ export function HourlyStrip({ hours, units }: HourlyStripProps) {
           >
             <span
               className={cn(
-                'tnum text-[11px] font-semibold uppercase tracking-wide',
+                'tnum text-[12px] font-semibold',
                 isNow ? 'text-aurora-400' : 'text-surface-muted',
               )}
             >

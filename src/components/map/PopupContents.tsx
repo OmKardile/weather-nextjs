@@ -83,7 +83,7 @@ export function PointPopup({ lng, lat, units, onClose }: PointPopupProps) {
   return (
     <div className="relative w-[min(280px,calc(100vw-3rem))] p-4 pr-10">
       <PopupCloseButton onClose={onClose} />
-      <p className="tnum text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-faint">
+      <p className="tnum card-label-muted">
         Point forecast
       </p>
       {error ? (
@@ -167,7 +167,7 @@ export function QuakePopup({ quake, onClose }: { quake: GeoQuake; onClose: () =>
   return (
     <div className="relative w-[min(280px,calc(100vw-3rem))] p-4 pr-10">
       <PopupCloseButton onClose={onClose} />
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-faint">
+      <p className="card-label-muted">
         Earthquake · USGS
       </p>
       <p className="mt-1.5 flex items-center gap-2">

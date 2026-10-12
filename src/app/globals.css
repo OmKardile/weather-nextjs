@@ -62,7 +62,7 @@
   --color-mist: #eaf4f1;
 
   /* Radii — soft, premium */
-  --radius-card: 1.25rem;
+  --radius-card: 1.75rem;
   --radius-hero: 1.75rem;
   --radius-pill: 999px;
 
@@ -262,85 +262,11 @@
 /* ------------------------------------------------------------------ */
 
 @layer components {
-  .glass,
-  .glass-strong,
-  .glass-subtle {
-    --glass-hi: rgb(255 255 255 / 0.22); /* top-edge specular */
-    --glass-lo: transparent;             /* bottom-edge shade (light surfaces) */
-  }
-
-  /* Base-level recipe — workhorse cards (10+ per screen: blur stays
-     modest, noise baked at 5% alpha, real border so border-color and
-     border-side utilities keep working). */
-  .glass {
-    background-color: color-mix(in srgb, var(--surface) 100%, rgb(var(--glass-tint) / 1) 6%);
-    background-image:
-      linear-gradient(180deg, var(--glass-hi), transparent 1px),
-      linear-gradient(0deg, var(--glass-lo), transparent 1px),
-      var(--glass-noise-faint);
-    background-size: 100% 100%, 100% 100%, 168px 168px;
-    border: 1px solid var(--surface-border);
-    -webkit-backdrop-filter: blur(16px) saturate(150%);
-    backdrop-filter: blur(16px) saturate(150%);
-    box-shadow: var(--shadow-glass);
-  }
-
-  /* Raised-level recipe — stronger tinted fill, inner hairline ring
-     for the "double border" feel. */
-  .glass-strong {
-    --glass-hi: rgb(255 255 255 / 0.32);
-    background-color: color-mix(in srgb, var(--surface-strong) 100%, rgb(var(--glass-tint) / 1) 10%);
-    background-image:
-      linear-gradient(180deg, var(--glass-hi), transparent 1px),
-      linear-gradient(0deg, var(--glass-lo), transparent 1px),
-      var(--glass-noise-faint);
-    background-size: 100% 100%, 100% 100%, 168px 168px;
-    border: 1px solid var(--surface-border);
-    -webkit-backdrop-filter: blur(24px) saturate(165%);
-    backdrop-filter: blur(24px) saturate(165%);
-    box-shadow:
-      inset 0 0 0 1px rgb(255 255 255 / 0.07),
-      var(--shadow-glass-lg);
-  }
-
-  /* Base at reduced strength (~65% fill, blur 12) — hourly chips and
-     small controls. No noise: up to 24 of these render at once. */
-  .glass-subtle {
-    --glass-hi: rgb(255 255 255 / 0.12);
-    background-color: color-mix(in srgb, var(--surface-subtle) 100%, rgb(var(--glass-tint) / 1) 6%);
-    background-image: linear-gradient(180deg, var(--glass-hi), transparent 1px);
-    border: 1px solid var(--surface-border);
-    -webkit-backdrop-filter: blur(12px) saturate(140%);
-    backdrop-filter: blur(12px) saturate(140%);
-  }
-
-  /* Light scenes: brighter top highlight + faint bottom shade so glass
-     reads against pale skies (v1 light-surface invisibility fix). */
-  [data-surface="light"] .glass,
-  [data-surface="light"] .glass-strong,
-  [data-surface="light"] .glass-subtle {
-    --glass-hi: rgb(255 255 255 / 0.5);
-    --glass-lo: rgb(0 0 0 / 0.05);
-  }
-
-  [data-surface="light"] .glass-strong {
-    box-shadow:
-      inset 0 0 0 1px rgb(255 255 255 / 0.45),
-      var(--shadow-glass-lg);
-  }
-
-  .glass-hover {
-    transition:
-      background-color 250ms var(--ease-soft),
-      border-color 250ms var(--ease-soft),
-      box-shadow 250ms var(--ease-soft),
-      transform 250ms var(--ease-out-expo);
-  }
-
-  .glass-hover:hover {
-    background-color: color-mix(in srgb, var(--surface-strong) 100%, rgb(var(--glass-tint) / 1) 8%);
-    border-color: var(--surface-ring);
-  }
+  /* Material classes (.glass / .glass-strong / .glass-subtle / .lg / .surface-*)
+     now live in src/components/glass/glass.css — the flat Surface + Liquid
+     Glass recipes (iOS 27). These aliases are redefined there, unlayered,
+     so they win over anything here. Only non-material component classes
+     remain in this layer. */
 
   .border-surface {
     border-color: var(--surface-border);

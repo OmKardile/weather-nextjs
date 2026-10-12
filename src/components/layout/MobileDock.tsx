@@ -1,16 +1,18 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Glass } from '@/components/glass/Glass';
+import { LiquidGlass } from '@/components/glass/LiquidGlass';
 import { Icon } from '@/components/icons/Icon';
 import { springs } from '@/lib/motion';
 import { cn } from '@/lib/utils';
 
 /* ================================================================== */
-/* MobileDock — floating glass nav (macOS dock feel).                  */
-/* Today · Map · Ask AI · Cities · Settings. Icons magnify on pointer */
-/* hover (desktop-width breakpoints); active tab gets a sliding       */
-/* aurora pill. The Map tab opens the full-screen map overlay.        */
+/* MobileDock — floating Liquid Glass capsule (iOS 27 tab bar).        */
+/*                                                                     */
+/* bottom: max(12px, env(safe-area-inset-bottom)) · height 64 · 12px   */
+/* side margins. Labels 11px sentence-case. The selected tab is an     */
+/* inner lighter glass capsule that morphs between positions           */
+/* (layoutId spring + brief scaleX stretch mid-travel).                */
 /* ================================================================== */
 
 export type DockTab = 'today' | 'map' | 'cities' | 'ai' | 'settings';
@@ -33,15 +35,16 @@ export function MobileDock({ active, onChange, className }: MobileDockProps) {
   return (
     <nav
       aria-label="App sections"
-      className={cn('fixed inset-x-0 bottom-0 z-40 lg:hidden', className)}
+      className={cn('pointer-events-none fixed inset-x-0 bottom-0 z-40 lg:hidden', className)}
     >
-      {/* Legibility scrim behind the dock */}
       <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[rgb(7_19_20/0.5)] to-transparent"
-      />
-      <div className="relative mx-auto w-fit translate-y-0 pb-[max(0.85rem,env(safe-area-inset-bottom))]">
-        <Glass level="overlay" className="flex items-center gap-0.5 rounded-full p-1.5">
+        className="pointer-events-auto mx-auto mb-[max(12px,env(safe-area-inset-bottom))] w-fit px-3"
+      >
+        {/* Refraction budget slot #1 — the dock is always glass. */}
+        <LiquidGlass
+          refract
+          className="flex h-16 items-center gap-0.5 rounded-full px-1.5"
+        >
           {ITEMS.map((item) => {
             const isActive = active === item.id;
             return (
@@ -50,13 +53,18 @@ export function MobileDock({ active, onChange, className }: MobileDockProps) {
                 type="button"
                 onClick={() => onChange(item.id)}
                 aria-current={isActive ? 'page' : undefined}
-                className="focus-ring group relative flex h-11 min-w-[64px] flex-col items-center justify-center gap-0.5 rounded-full px-2 transition-transform duration-200 ease-[var(--ease-spring-bouncy)] hover:scale-110 active:scale-95 sm:min-w-[72px]"
+                className="focus-ring group relative flex h-14 min-w-[62px] flex-col items-center justify-center gap-0.5 rounded-full px-2 transition-transform duration-200 ease-[var(--ease-spring-bouncy)] active:scale-95 sm:min-w-[70px]"
               >
                 {isActive && (
                   <motion.span
                     layoutId="dock-active-pill"
-                    transition={springs.bouncy}
-                    className="absolute inset-0 rounded-full bg-aurora-500/18 ring-1 ring-inset ring-aurora-500/35"
+                    initial={false}
+                    animate={{ scaleX: [1.08, 1] }}
+                    transition={{
+                      ...springs.bouncy,
+                      scaleX: { duration: 0.26, ease: 'easeOut' },
+                    }}
+                    className="lg-selected absolute inset-0 rounded-full"
                     aria-hidden="true"
                   />
                 )}
@@ -66,13 +74,13 @@ export function MobileDock({ active, onChange, className }: MobileDockProps) {
                   animated
                   className={cn(
                     'relative transition-colors duration-200',
-                    isActive ? 'text-aurora-400' : 'text-surface-muted group-hover:text-surface',
+                    isActive ? 'text-white' : 'text-white/72 group-hover:text-white',
                   )}
                 />
                 <span
                   className={cn(
-                    'relative text-[9px] font-semibold uppercase tracking-[0.08em] transition-colors duration-200',
-                    isActive ? 'text-aurora-300' : 'text-surface-faint group-hover:text-surface-muted',
+                    'relative text-[11px] font-medium leading-none transition-colors duration-200',
+                    isActive ? 'text-white' : 'text-white/72 group-hover:text-white',
                   )}
                 >
                   {item.label}
@@ -80,7 +88,7 @@ export function MobileDock({ active, onChange, className }: MobileDockProps) {
               </button>
             );
           })}
-        </Glass>
+        </LiquidGlass>
       </div>
     </nav>
   );

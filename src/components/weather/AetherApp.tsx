@@ -15,6 +15,7 @@ import { getScene } from '@/lib/scenes';
 import { getDayPhase } from '@/lib/time';
 import type { City, Condition, DayPhase, WeatherBundle } from '@/types/weather';
 import { Glass } from '@/components/glass/Glass';
+import { useLiquidGlassVars } from '@/components/glass/LiquidGlass';
 import { Icon } from '@/components/icons/Icon';
 import { AlertDigest } from '@/components/ai/AlertDigest';
 import { OfficialAlerts } from '@/components/alerts/OfficialAlerts';
@@ -29,6 +30,7 @@ import type { DockTab } from '@/components/layout/MobileDock';
 import { SettingsContent, SettingsSheet } from '@/components/layout/SettingsSheet';
 import { WeatherScene } from '@/components/weather/WeatherScene';
 import { CurrentWeather } from '@/components/weather/CurrentWeather';
+import { CompareDialog } from '@/components/weather/CompareDialog';
 import { ForecastSections } from '@/components/weather/ForecastSections';
 import { SavedCities } from '@/components/weather/SavedCities';
 import { EmptyState, ErrorState, LoadingSkeletons, OfflineBanner, StaleDataBanner } from '@/components/weather/StateViews';
@@ -57,6 +59,7 @@ export function AetherApp() {
   // v2 shell state
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [dockTab, setDockTab] = useState<DockTab>('today');
@@ -338,6 +341,10 @@ export function AetherApp() {
     setMapOpen(tab === 'map');
   }, []);
 
+  // Liquid Glass material pipeline — CSS vars on the ROOT element (no
+  // extra wrapper div: it would shift useId paths and break hydration).
+  const liquidGlassVars = useLiquidGlassVars();
+
   const statusText = !mounted
     ? ''
     : !activeCity
@@ -366,6 +373,7 @@ export function AetherApp() {
     <div
       data-surface={surfaceMode}
       data-tint={tint}
+      style={liquidGlassVars}
       className="relative flex min-h-screen flex-col lg:h-screen lg:min-h-0 lg:overflow-hidden"
     >
       <WeatherScene scene={scene} />
@@ -405,6 +413,7 @@ export function AetherApp() {
           onLocate={handleLocate}
           locating={locating}
           onAddCity={() => setPaletteOpen(true)}
+          onCompare={() => setCompareOpen(true)}
         />
 
         <main
@@ -445,7 +454,7 @@ export function AetherApp() {
 
             {dockTab === 'cities' && (
               <div className="flex flex-col gap-4">
-                <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-surface-muted">
+                <h2 className="card-label">
                   Saved cities
                 </h2>
                 <SavedCities
@@ -565,6 +574,7 @@ export function AetherApp() {
         onSaveCurrentCity={handleToggleSave}
         onRefresh={() => weather.refetch()}
         onJumpTo={scrollToSection}
+        onCompareCities={() => setCompareOpen(true)}
       />
 
       <SettingsSheet
@@ -573,6 +583,16 @@ export function AetherApp() {
         units={units}
         onSetUnits={setUnits}
         onCustomizeCards={handleCustomizeCards}
+      />
+
+      {/* Compare saved cities — side-by-side live conditions */}
+      <CompareDialog
+        open={compareOpen}
+        onOpenChange={setCompareOpen}
+        cities={savedCities}
+        activeCity={activeCity}
+        units={units}
+        onSelect={selectCity}
       />
 
       {/* Full-screen Map mode overlay (client-only, lazy) */}

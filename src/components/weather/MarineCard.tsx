@@ -31,7 +31,7 @@ export function MarineCard({ city, units }: MarineCardProps) {
   if (query.isPending && !data) {
     return (
       <div className="glass rounded-[var(--radius-card)] p-4" aria-busy="true">
-        <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+        <p className="flex items-center gap-1.5 card-label">
           <Waves className="h-3.5 w-3.5" aria-hidden="true" />
           Marine
         </p>
@@ -51,7 +51,7 @@ export function MarineCard({ city, units }: MarineCardProps) {
 
   return (
     <div className="glass glass-hover rounded-[var(--radius-card)] p-4">
-      <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+      <p className="flex items-center gap-1.5 card-label">
         <Waves className="h-3.5 w-3.5" aria-hidden="true" />
         Marine
       </p>

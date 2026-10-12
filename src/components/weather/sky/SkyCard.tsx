@@ -223,7 +223,7 @@ function SkyCardInner({ bundle, units }: SkyCardProps): JSX.Element {
   return (
     <div className="glass animate-fade-up flex h-full flex-col rounded-[var(--radius-card)] p-4 shadow-[var(--shadow-glass)] sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
-        <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+        <p className="flex items-center gap-1.5 card-label">
           <Icon name="sunrise" size={14} strokeWidth={2} aria-hidden="true" />
           Golden &amp; blue hour
         </p>
@@ -315,7 +315,7 @@ function SkyCardInner({ bundle, units }: SkyCardProps): JSX.Element {
       {/* --- stargazing tonight --- */}
       <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--surface-border)' }}>
         <div className="flex items-center justify-between gap-3">
-          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+          <p className="flex items-center gap-1.5 card-label">
             <Icon name="moon-phase" size={14} strokeWidth={2} aria-hidden="true" />
             Stargazing tonight
           </p>
@@ -369,7 +369,7 @@ function SkyCardInner({ bundle, units }: SkyCardProps): JSX.Element {
 
       {/* --- moon calendar --- */}
       <div className="mt-4 border-t pt-4" style={{ borderColor: 'var(--surface-border)' }}>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+        <p className="card-label">
           Moon · next {MOON_NIGHTS} nights
         </p>
         <div

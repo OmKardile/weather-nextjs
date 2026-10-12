@@ -455,6 +455,126 @@ function Lightning() {
 }
 
 /* ------------------------------------------------------------------ */
+/* Light blobs — refractable scenery for the Liquid Glass controls.    */
+/*                                                                     */
+/* Large soft radial glows + a diagonal gradient band + a few small    */
+/* high-contrast orbs, all pinned near the TOP and BOTTOM edges so     */
+/* the middle stays calm for text. Without these, a flat teal sky      */
+/* gives the lensing nothing to bend.                                  */
+/* ------------------------------------------------------------------ */
+
+type BlobPalette = { a: string; b: string; c: string; orb: string };
+
+const BLOB_PALETTES: Record<'dark-night' | 'dark-golden' | 'light', BlobPalette> = {
+  'dark-night': { a: '#45D1B3', b: '#7C6FA8', c: '#1FA98C', orb: '#BFF7E8' },
+  'dark-golden': { a: '#F0954A', b: '#B4768B', c: '#8A6FA0', orb: '#FFD9A0' },
+  light: { a: '#FFE9A3', b: '#FFFFFF', c: '#9FDFD3', orb: '#FFF7E0' },
+};
+
+interface BlobSpec {
+  className: string;
+  style: CSSProperties;
+}
+
+function SceneBlobs({
+  seed,
+  phase,
+  surface,
+}: {
+  seed: string;
+  phase: DayPhase;
+  surface: 'dark' | 'light';
+}) {
+  const palette =
+    surface === 'light'
+      ? BLOB_PALETTES.light
+      : phase === 'night'
+        ? BLOB_PALETTES['dark-night']
+        : BLOB_PALETTES['dark-golden'];
+
+  const blobs = useMemo<BlobSpec[]>(() => {
+    const rand = mulberry32(hashString(`${seed}:blobs`));
+    const jitter = (v: number, spread: number) => v + (rand() - 0.5) * spread;
+    return [
+      // Big soft glows — top edge
+      {
+        className: 'scene-blob scene-blob-a',
+        style: {
+          background: `radial-gradient(circle, ${palette.a} 0%, transparent 70%)`,
+          left: `${jitter(-18, 14)}%`,
+          top: `${jitter(-16, 10)}%`,
+          animationDelay: `${rand() * -60}s`,
+          animationDuration: `${52 + rand() * 26}s`,
+        },
+      },
+      {
+        className: 'scene-blob scene-blob-b',
+        style: {
+          background: `radial-gradient(circle, ${palette.b} 0%, transparent 70%)`,
+          right: `${jitter(-14, 12)}%`,
+          top: `${jitter(-10, 12)}%`,
+          animationDelay: `${rand() * -60}s`,
+          animationDuration: `${58 + rand() * 30}s`,
+        },
+      },
+      // Bottom edge
+      {
+        className: 'scene-blob scene-blob-c',
+        style: {
+          background: `radial-gradient(circle, ${palette.c} 0%, transparent 70%)`,
+          left: `${jitter(4, 18)}%`,
+          bottom: `${jitter(-18, 12)}%`,
+          animationDelay: `${rand() * -60}s`,
+          animationDuration: `${60 + rand() * 28}s`,
+        },
+      },
+      {
+        className: 'scene-blob scene-blob-d',
+        style: {
+          background: `radial-gradient(circle, ${palette.a} 0%, transparent 72%)`,
+          right: `${jitter(-16, 14)}%`,
+          bottom: `${jitter(-14, 10)}%`,
+          animationDelay: `${rand() * -60}s`,
+          animationDuration: `${48 + rand() * 24}s`,
+        },
+      },
+      // Small high-contrast orbs near the edges — the sparkle the rim
+      // light catches as it slides under the dock / top capsule.
+      {
+        className: 'scene-orb',
+        style: {
+          background: palette.orb,
+          left: `${jitter(12, 10)}%`,
+          top: `${jitter(6, 6)}%`,
+        },
+      },
+      {
+        className: 'scene-orb scene-orb-late',
+        style: {
+          background: palette.orb,
+          right: `${jitter(16, 10)}%`,
+          bottom: `${jitter(8, 8)}%`,
+        },
+      },
+    ];
+  }, [seed, palette]);
+
+  return (
+    <div className="scene-layer" aria-hidden="true">
+      <div
+        className="scene-band"
+        style={{
+          background: `linear-gradient(105deg, transparent 20%, ${palette.b}55 46%, ${palette.a}40 58%, transparent 82%)`,
+        }}
+      />
+      {blobs.map((blob, i) => (
+        <span key={i} className={blob.className} style={blob.style} />
+      ))}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
 /* SceneLayers — renders only the layers enabled by the scene config   */
 /* ------------------------------------------------------------------ */
 
@@ -466,6 +586,8 @@ export const SceneLayers = memo(function SceneLayers({ scene }: { scene: SceneCo
 
   return (
     <>
+      {/* Blobs first — closest to the base gradient, under every other layer. */}
+      <SceneBlobs seed={key} phase={phase} surface={surface} />
       {layers.stars ? <Stars seed={key} /> : null}
       {layers.aurora ? <Aurora seed={key} /> : null}
       {layers.moon ? <Moon seed={key} /> : null}

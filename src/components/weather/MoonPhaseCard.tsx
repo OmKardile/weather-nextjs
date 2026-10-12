@@ -82,7 +82,7 @@ export function MoonPhaseCard({ bundle, className }: MoonPhaseCardProps) {
 
   return (
     <Glass level="base" className={cn('rounded-2xl p-4 sm:p-5', className)}>
-      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+      <p className="card-label">
         Moon
       </p>
       <div className="mt-3 flex items-center gap-4">

@@ -1,6 +1,6 @@
 'use client';
 
-import { Glass } from '@/components/glass/Glass';
+import { LiquidGlass } from '@/components/glass/LiquidGlass';
 import { Icon } from '@/components/icons/Icon';
 import { cn } from '@/lib/utils';
 
@@ -74,8 +74,8 @@ export function TimeScrubber(props: TimeScrubberProps) {
   if (!showRadar && !showHour) return null;
 
   return (
-    <Glass
-      level="raised"
+    <LiquidGlass
+      variant="clear"
       role="group"
       aria-label="Map time controls"
       className="absolute inset-x-3 bottom-3 z-20 rounded-3xl p-3 lg:inset-x-auto lg:left-1/2 lg:w-[min(560px,calc(100vw-14rem))] lg:-translate-x-1/2"
@@ -84,7 +84,7 @@ export function TimeScrubber(props: TimeScrubberProps) {
         {showRadar && (
           <div className="flex items-center gap-2">
             <span className="flex min-w-0 flex-1 flex-col">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-surface-faint">
+              <span className="card-label-muted">
                 Radar · Past 2h
               </span>
               <span className="tnum truncate text-[13px] font-semibold text-surface">
@@ -125,7 +125,7 @@ export function TimeScrubber(props: TimeScrubberProps) {
         {showHour && (
           <div className="flex items-center gap-2">
             <span className="flex w-20 shrink-0 flex-col">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-surface-faint">
+              <span className="card-label-muted">
                 Forecast
               </span>
               <span className="tnum text-[13px] font-semibold text-surface">
@@ -172,6 +172,6 @@ export function TimeScrubber(props: TimeScrubberProps) {
           </div>
         )}
       </div>
-    </Glass>
+    </LiquidGlass>
   );
 }

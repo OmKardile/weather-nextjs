@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import { Glass } from '@/components/glass/Glass';
+import { SegmentedControl } from '@/components/glass/SegmentedControl';
 import { Icon } from '@/components/icons/Icon';
 import { AiBadge, MarkdownLite, StreamingCursor, readNdjsonStream } from '@/components/ai/ai-shared';
 import { usePreferences } from '@/hooks/use-preferences';
@@ -159,7 +160,6 @@ export function BriefingCard({ city, units, className }: BriefingCardProps): JSX
   return (
     <Glass
       level="raised"
-      refract
       as="section"
       aria-label={sectionLabel}
       className={cn('rounded-[var(--radius-card)] p-5', className)}
@@ -180,31 +180,15 @@ export function BriefingCard({ city, units, className }: BriefingCardProps): JSX
             <Icon name="info" size={16} />
           </span>
         )}
-        <div
-          role="group"
+        <SegmentedControl
           aria-label="AI card view"
-          className="glass-subtle flex h-8 items-center rounded-full p-0.5"
-        >
-          {(Object.keys(VIEW_META) as CardView[]).map((key) => {
-            const active = view === key;
-            return (
-              <button
-                key={key}
-                type="button"
-                aria-pressed={active}
-                onClick={active ? undefined : () => setView(key)}
-                className={cn(
-                  'focus-ring h-7 rounded-full px-3 text-[11px] font-semibold transition-all duration-200',
-                  active
-                    ? 'bg-aurora-500 text-[#04211C] shadow-[0_0_14px_-4px_rgb(34_188_160/0.8)]'
-                    : 'text-surface-muted hover:text-surface',
-                )}
-              >
-                {VIEW_META[key].label}
-              </button>
-            );
-          })}
-        </div>
+          options={(Object.keys(VIEW_META) as CardView[]).map((key) => ({
+            id: key,
+            label: VIEW_META[key].label,
+          }))}
+          value={view}
+          onChange={setView}
+        />
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
           <span
             title={`AI voice: ${voiceLabel} — tone only, numbers never change`}

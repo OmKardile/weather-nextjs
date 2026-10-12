@@ -146,7 +146,7 @@ export function ForecastConfidence({ bundle, units, query }: ForecastConfidenceP
   if (query.isPending && !data) {
     return (
       <div className="glass rounded-[var(--radius-card)] p-5" aria-busy="true">
-        <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+        <p className="flex items-center gap-1.5 card-label">
           <Icon name="gauge" size={14} strokeWidth={2} />
           Forecast confidence
         </p>
@@ -173,7 +173,7 @@ export function ForecastConfidence({ bundle, units, query }: ForecastConfidenceP
 
   return (
     <div className="glass animate-fade-up flex h-full flex-col rounded-[var(--radius-card)] p-5 shadow-[var(--shadow-glass)]">
-      <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+      <p className="flex items-center gap-1.5 card-label">
         <Icon name="gauge" size={14} strokeWidth={2} aria-hidden="true" />
         Forecast confidence
       </p>

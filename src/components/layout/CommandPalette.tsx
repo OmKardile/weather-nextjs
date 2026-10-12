@@ -35,6 +35,7 @@ interface CommandPaletteProps {
   onSelectCity: (city: City) => void;
   onToggleUnits: () => void;
   onCustomizeCards: () => void;
+  onCompareCities: () => void;
   onAskAi: () => void;
   onToggleMap: () => void;
   onLocate: () => void;
@@ -80,6 +81,7 @@ export function CommandPalette(props: CommandPaletteProps) {
     onSelectCity,
     onToggleUnits,
     onCustomizeCards,
+    onCompareCities,
     onAskAi,
     onToggleMap,
     onLocate,
@@ -240,6 +242,16 @@ export function CommandPalette(props: CommandPaletteProps) {
                     <Icon name="grip" size={16} className="shrink-0 text-surface-faint" />
                     Customize cards
                   </CommandItem>
+                  {savedCities.length >= 2 && (
+                    <CommandItem
+                      value="compare-cities"
+                      onSelect={() => run(onCompareCities)}
+                      className="rounded-xl text-surface aria-selected:bg-aurora-500/15"
+                    >
+                      <Icon name="compare" size={16} className="shrink-0 text-aurora-400" />
+                      Compare saved cities
+                    </CommandItem>
+                  )}
                   <CommandItem
                     value="map"
                     onSelect={() => run(onToggleMap)}

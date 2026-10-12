@@ -85,7 +85,7 @@ function SectionBody({
           {headerLeading}
           <h2
             id={`${htmlFor}-heading`}
-            className="truncate text-[11px] font-semibold uppercase tracking-[0.16em] text-surface-muted"
+            className="truncate card-label"
           >
             {title}
           </h2>

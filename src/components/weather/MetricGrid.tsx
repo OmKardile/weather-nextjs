@@ -55,7 +55,7 @@ function Card({
 }) {
   return (
     <div className={`glass rounded-[var(--radius-card)] p-4 ${className ?? ''}`}>
-      <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+      <p className="flex items-center gap-1.5 card-label">
         <span aria-hidden="true">{icon}</span>
         {label}
       </p>

@@ -80,7 +80,7 @@ export function SavedCities({
       <div className="mb-2.5 flex items-center justify-between gap-2">
         <h2
           id="saved-cities-heading"
-          className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-surface-muted"
+          className="flex items-center gap-1.5 card-label"
         >
           <Star className="h-3.5 w-3.5" aria-hidden="true" />
           Saved cities

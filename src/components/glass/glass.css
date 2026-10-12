@@ -1,273 +1,486 @@
 /* ==================================================================
-   Aether 2.0 — Liquid Glass primitive (macOS Tahoe feel)
-   Classes: .glass-2-base / .glass-2-raised / .glass-2-overlay
-            (+ .glass-refract / .refract-on, .glass-scrim[-top])
-   Consumed by <Glass> (src/components/glass/Glass.tsx). The legacy
-   aliases (.glass, .glass-strong, …) live in src/app/globals.css.
+   Aether 3.1 — Liquid Glass (iOS 27 / WWDC26) material system
 
-   ------------------------------------------------------------------
-   RULES OF THE SYSTEM (read before composing glass UI)
-   ------------------------------------------------------------------
-   1. MAX ~6 simultaneous backdrop-filter layers on screen. Cards use
-      `base` only; `raised` is for ONE hero/feature surface per view;
-      `overlay` is for command palette, dock, modals, dropdowns.
-   2. Glass-on-glass is never more than 2 deep (e.g. overlay dock may
-      sit above a base card, but never overlay-over-overlay-over-base).
-   3. NO backdrop blur on long scrolling lists — blur the container's
-      static parent, or use plain fills for list rows.
-   4. Text on glass must hit WCAG AA — over busy scenes compose a
-      .glass-scrim child layer behind the text block.
-   5. Concentric radii: inner corner radius = outer radius − padding
-      (e.g. outer rounded-[var(--radius-card)] = 20px with p-4 → inner
-      rounded-[12px]) so nested corners share a center point.
-   6. Floating layers (dropdowns, popovers) that must escape a glass
-      card: give the <Glass> ELEMENT itself a z-* utility (z-40/z-50).
-      Each glass-2 element isolates its own stacking context, so
-      z-index inside a card is scoped to that card.
-   7. Border sides: glass-2 uses a transparent border + gradient edge
-      painted via layered backgrounds — do NOT apply Tailwind
-      border-width/border-color utilities to it (they have no effect
-      on the painted edge). Restyle via --glass-* custom properties.
+   TWO LAYERS ONLY (Apple HIG):
+   · CONTROL layer — .lg (LiquidGlass): true lensing on Chromium,
+     rim light, specular, press gel. For top bar buttons, unit toggle,
+     dock, segmented controls, sheet grabber, map controls, floating
+     buttons. Variants: regular everywhere, clear ONLY over the
+     full-screen map (with dimming scrim). Never mix variants in view.
+   · CONTENT layer — .surface / .glass aliases (flat Surface):
+     blur(22px) saturate(1.4), light tint, hairline, soft shadow.
+     NO refraction, NO specular — flatter on purpose so controls pop.
 
-   ------------------------------------------------------------------
-   Layer anatomy (per glass-2 element)
-   ------------------------------------------------------------------
-   · element     : translucent tinted fill (padding-box) + 1px gradient
-                   hairline edge (border-box, follows any border-radius),
-                   backdrop blur/saturate, top-edge specular inset,
-                   bottom-edge shade on light surfaces, layered shadow
-   · ::before  z −1 : feTurbulence noise, overlay-blended — kills
-                   gradient banding (opacity ≈ 0.032, invisible but felt)
-   · ::after   z auto : pointer specular — radial highlight at
-                   var(--spec-x/--spec-y), faded in via var(--spec-active)
-                   (set by useSpecular; hover-capable devices only)
+   Never glass-on-glass; never more than 2 stacked translucent layers.
+   Card chips (.glass-subtle / .surface-subtle) are PLAIN fills — no
+   backdrop-filter on scrolling list rows (perf rule 3).
 
-   Fill recipe (adapts to dark/light scenes via the --surface vars and
-   to weather via --glass-tint, both set on the [data-surface]/[data-tint]
-   app wrapper in globals.css):
-     color-mix(in srgb, var(--surface|…-strong) 100%, rgb(var(--glass-tint) / 1) X%)
-   with X = 6 / 10 / 12 % for base / raised / overlay.
+   The transparency slider (Settings → Liquid Glass) drives:
+     --lg-tint-a       .04 → .55   tint alpha
+     --lg-blur         2px → 28px  blur radius
+     --lg-refract      1.0 → 0.25  refraction strength
+     --lg-rim          1.0 → 0.35  rim brightness
+     --surface-tint-a  .08 → .40   content-card tint
+   Under prefers-reduced-transparency the app forces fully tinted.
    ================================================================== */
 
-/* NOTE: --spec-active is intentionally NOT registered via @property.
-   Unregistered custom properties inherit, so ::after sees the value
-   the hook sets on the element (an @property with inherits:false would
-   freeze the pseudo-element at the initial value). The fade works via
-   the transition on opacity itself, which needs no registration. */
+/* ================================================================== */
+/* CONTROL LAYER — .lg (LiquidGlass)                                   */
+/* ================================================================== */
 
-/* ------------------------------------------------------------------ */
-/* Shared anatomy                                                      */
-/* ------------------------------------------------------------------ */
-
-.glass-2-base,
-.glass-2-raised,
-.glass-2-overlay {
+.lg {
+  --lg-rim-c: 1; /* extra rim multiplier ([data-surface="light"] boosts) */
   position: relative;
   isolation: isolate;
-  border: 1px solid transparent; /* painted by the gradient edge below */
-  --glass-edge: linear-gradient(
-    180deg,
-    rgb(255 255 255 / 0.28),
-    rgb(255 255 255 / 0.06) 42%,
-    rgb(255 255 255 / 0.14)
-  );
-  --glass-hi: rgb(255 255 255 / 0.22); /* top-edge specular */
-  --glass-lo: transparent;             /* bottom-edge shade (light surfaces) */
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
-  backdrop-filter: blur(16px) saturate(150%);
-  background:
-    linear-gradient(var(--glass-fill), var(--glass-fill)) padding-box,
-    var(--glass-edge) border-box;
+  /* (a) backdrop — fallback blur; Chromium + filter overrides via
+     --lg-backdrop (set inline by <LiquidGlass> when a refraction
+     filter is active): url(#…) blur(2px) saturate(1.7) brightness(1.05) */
+  -webkit-backdrop-filter: var(--lg-backdrop, blur(max(18px, var(--lg-blur, 2px))) saturate(1.8));
+  backdrop-filter: var(--lg-backdrop, blur(max(18px, var(--lg-blur, 2px))) saturate(1.8));
+  /* (b) tint — VERY light, scene-luminance aware (dark scenes .05–.10;
+     light scenes lift via [data-surface="light"] below) */
+  background-color: rgb(255 255 255 / calc(var(--lg-tint-a, 0.06) * var(--lg-variant-k, 1)));
+  /* (c) edge + light — inset top highlight, inner hairline, inner glow
+     (d) shadow */
   box-shadow:
-    inset 0 1px 0 var(--glass-hi),
-    inset 0 -1px 0 var(--glass-lo),
-    var(--shadow-glass);
+    inset 0 1px 0 rgb(255 255 255 / calc(0.5 * var(--lg-rim, 1))),
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.12),
+    inset 0 0 18px rgb(255 255 255 / 0.05),
+    0 10px 30px rgb(0 0 0 / 0.2),
+    0 2px 6px rgb(0 0 0 / 0.12);
+  /* text on controls is always white-family (vibrancy tiers) */
+  color: rgb(255 255 255 / 1);
 }
 
-/* Light scenes: brighter top highlight, faint bottom shade, crisper
-   hairline (white top → ink bottom) so glass never disappears against
-   pale skies. */
-[data-surface="light"] .glass-2-base,
-[data-surface="light"] .glass-2-raised,
-[data-surface="light"] .glass-2-overlay {
-  --glass-edge: linear-gradient(
-    180deg,
-    rgb(255 255 255 / 0.9),
-    rgb(20 48 52 / 0.1) 45%,
-    rgb(20 48 52 / 0.16)
-  );
-  --glass-hi: rgb(255 255 255 / 0.5);
-  --glass-lo: rgb(0 0 0 / 0.05);
+/* Light scenes: brighter tint + a touch of black so controls read over
+   pale skies (Apple lightens AND dims simultaneously). */
+[data-surface='light'] .lg {
+  background-color: rgb(255 255 255 / calc(min(0.28, var(--lg-tint-a, 0.06) + 0.14)));
+  background-image: linear-gradient(rgb(0 0 0 / 0.04), rgb(0 0 0 / 0.04));
 }
 
-/* ------------------------------------------------------------------ */
-/* Level: base — the workhorse for cards                               */
-/* ------------------------------------------------------------------ */
-
-.glass-2-base {
-  --glass-fill: color-mix(in srgb, var(--surface) 100%, rgb(var(--glass-tint) / 1) 6%);
-}
-
-/* ------------------------------------------------------------------ */
-/* Level: raised — hero / feature surfaces                             */
-/* ------------------------------------------------------------------ */
-
-.glass-2-raised {
-  --glass-fill: color-mix(in srgb, var(--surface-strong) 100%, rgb(var(--glass-tint) / 1) 10%);
-  --glass-hi: rgb(255 255 255 / 0.32); /* inner top specular — "double border" feel */
-  -webkit-backdrop-filter: blur(24px) saturate(165%);
-  backdrop-filter: blur(24px) saturate(165%);
+/* Clear variant — ONLY over the full-screen map. Less tint, more
+   depth scrim for legibility over bright tiles. */
+.lg[data-lg-variant='clear'] {
+  --lg-variant-k: 0.4;
   box-shadow:
-    inset 0 1px 0 var(--glass-hi),
-    inset 0 0 0 1px rgb(255 255 255 / 0.07), /* inner hairline ring */
-    inset 0 -1px 0 var(--glass-lo),
-    var(--shadow-glass-lg);
+    inset 0 1px 0 rgb(255 255 255 / calc(0.55 * var(--lg-rim, 1))),
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.14),
+    inset 0 0 26px rgb(0 0 0 / 0.2),
+    0 10px 30px rgb(0 0 0 / 0.24),
+    0 2px 6px rgb(0 0 0 / 0.14);
 }
 
-[data-surface="light"] .glass-2-raised {
-  box-shadow:
-    inset 0 1px 0 var(--glass-hi),
-    inset 0 0 0 1px rgb(255 255 255 / 0.45),
-    inset 0 -1px 0 var(--glass-lo),
-    var(--shadow-glass-lg);
-}
-
-/* ------------------------------------------------------------------ */
-/* Level: overlay — command palette, dock, modals, dropdowns           */
-/* Near-opaque: tinted fill + depth under-tint rgb(10 27 30 / .35) +   */
-/* deep base gradient. Perceived coverage on dark ≈ 0.83–0.87 (the     */
-/* 36px blur does the rest); on light the tinted fill alone lands      */
-/* ≈ 0.84 + a soft depth wash.                                         */
-/* ------------------------------------------------------------------ */
-
-.glass-2-overlay {
-  --glass-fill: color-mix(in srgb, var(--surface-strong) 100%, rgb(var(--glass-tint) / 1) 12%);
-  --glass-hi: rgb(255 255 255 / 0.3);
-  -webkit-backdrop-filter: blur(36px) saturate(180%);
-  backdrop-filter: blur(36px) saturate(180%);
-  background:
-    linear-gradient(var(--glass-fill), var(--glass-fill)) padding-box,
-    linear-gradient(rgb(10 27 30 / 0.35), rgb(10 27 30 / 0.35)) padding-box,
-    linear-gradient(rgb(10 27 30 / 0.7), rgb(10 27 30 / 0.8)) padding-box,
-    var(--glass-edge) border-box;
-  box-shadow:
-    inset 0 1px 0 var(--glass-hi),
-    inset 0 0 0 1px rgb(255 255 255 / 0.08),
-    inset 0 -1px 0 var(--glass-lo),
-    0 4px 10px rgb(7 19 20 / 0.2),
-    0 32px 80px -14px rgb(7 19 20 / 0.55);
-}
-
-[data-surface="light"] .glass-2-overlay {
-  background:
-    linear-gradient(var(--glass-fill), var(--glass-fill)) padding-box,
-    linear-gradient(rgb(235 244 241 / 0.35), rgb(226 238 234 / 0.42)) padding-box,
-    var(--glass-edge) border-box;
-  box-shadow:
-    inset 0 1px 0 var(--glass-hi),
-    inset 0 0 0 1px rgb(255 255 255 / 0.5),
-    inset 0 -1px 0 var(--glass-lo),
-    0 4px 10px rgb(66 92 88 / 0.14),
-    0 32px 80px -14px rgb(66 92 88 / 0.34);
-}
-
-/* ------------------------------------------------------------------ */
-/* Noise layer (::before) — overlay-blended fractal grain              */
-/* ------------------------------------------------------------------ */
-
-.glass-2-base::before,
-.glass-2-raised::before,
-.glass-2-overlay::before {
-  content: "";
+/* (c) rim light — 1px opposing-corner gradient ring: bright top-left
+   + bottom-right (~.6), faint on the other two corners (~.08). */
+.lg::before {
+  content: '';
   position: absolute;
   inset: 0;
-  z-index: -1; /* above the fill, below content (element isolates) */
   border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(
+    135deg,
+    rgb(255 255 255 / calc(0.6 * var(--lg-rim, 1) * var(--lg-rim-c, 1))) 0%,
+    rgb(255 255 255 / calc(0.08 * var(--lg-rim, 1) * var(--lg-rim-c, 1))) 24%,
+    rgb(255 255 255 / calc(0.08 * var(--lg-rim, 1) * var(--lg-rim-c, 1))) 76%,
+    rgb(255 255 255 / calc(0.6 * var(--lg-rim, 1) * var(--lg-rim-c, 1))) 100%
+  );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  mask-composite: exclude;
   pointer-events: none;
-  background-image: var(--glass-noise-src);
-  background-size: 168px 168px;
-  opacity: 0.032;
-  mix-blend-mode: overlay;
+  z-index: 1;
 }
 
-/* Overlay stacks the deepest gradients (fill + under-tint + deep base),
-   so it gets a touch more grain to stay dithered. */
-.glass-2-overlay::before {
-  opacity: 0.038;
-}
-
-/* ------------------------------------------------------------------ */
-/* Pointer specular (::after) — driven by useSpecular                  */
-/* ------------------------------------------------------------------ */
-
-.glass-2-base::after,
-.glass-2-raised::after,
-.glass-2-overlay::after {
-  content: "";
+/* Specular blob — pointer-following (useSpecular writes --spec-x/y and
+   --spec-active). Hidden under Reduce bright effects (.lg-calm). */
+.lg::after {
+  content: '';
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
   background: radial-gradient(
-    560px circle at var(--spec-x, 50%) var(--spec-y, -30%),
-    rgb(255 255 255 / 0.09),
-    transparent 55%
+    420px circle at var(--spec-x, 50%) var(--spec-y, -40%),
+    rgb(255 255 255 / 0.14),
+    transparent 60%
   );
   opacity: var(--spec-active, 0);
   transition: opacity 480ms var(--ease-soft, cubic-bezier(0.4, 0, 0.2, 1));
+  z-index: 1;
 }
 
-/* ------------------------------------------------------------------ */
-/* Liquid refraction — Chromium only                                   */
-/* <Glass refract> adds .glass-refract; a Chromium-only UA check adds   */
-/* .refract-on. The SVG filter (id="aether-refract", rendered once per */
-/* page by the first refract instance) displaces the noise layer into  */
-/* a subtle organic sheen. Browsers without the classes/filter simply   */
-/* keep the plain noise layer — nothing breaks.                        */
-/* ------------------------------------------------------------------ */
-
-.glass-refract.refract-on::before {
-  filter: url(#aether-refract);
+.lg.lg-calm::after {
+  display: none;
 }
 
-/* ------------------------------------------------------------------ */
-/* Scrims — text legibility over busy scenes                           */
-/* Compose as a CHILD of a glass element (it is position:absolute and  */
-/* stacks above the fill/noise, below content):                        */
-/*   <Glass><div className="glass-scrim" aria-hidden="true" />…</Glass>*/
-/* ------------------------------------------------------------------ */
-
-.glass-scrim,
-.glass-scrim-top {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  border-radius: inherit;
-  pointer-events: none;
+/* prefers-contrast: more — stronger rim + tint. */
+@media (prefers-contrast: more) {
+  .lg {
+    --lg-rim-c: 1.35;
+  }
 }
 
-.glass-scrim {
-  background: linear-gradient(to top, rgb(7 19 20 / 0.55), transparent);
+/* Interaction — press "gel" flex: scale .96 + brighten; release
+   springs back with a small overshoot (bouncy cubic-bezier). */
+.lg.lg-press {
+  transition:
+    transform 380ms var(--ease-spring-bouncy, cubic-bezier(0.34, 1.56, 0.64, 1)),
+    background-color 200ms var(--ease-soft, ease),
+    box-shadow 200ms var(--ease-soft, ease);
+  will-change: transform;
 }
 
-.glass-scrim-top {
-  background: linear-gradient(to bottom, rgb(7 19 20 / 0.55), transparent);
+.lg.lg-press:active {
+  transform: scale(0.96);
+  background-color: rgb(255 255 255 / calc(var(--lg-tint-a, 0.06) * 1.8 + 0.04));
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / calc(0.5 * var(--lg-rim, 1))),
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.16),
+    inset 0 0 22px rgb(255 255 255 / 0.08),
+    0 6px 18px rgb(0 0 0 / 0.22),
+    0 2px 4px rgb(0 0 0 / 0.12);
 }
-
-/* ------------------------------------------------------------------ */
-/* Reduced motion — specular + refraction off, noise stays (it is      */
-/* static texture, not motion)                                         */
-/* ------------------------------------------------------------------ */
 
 @media (prefers-reduced-motion: reduce) {
-  .glass-2-base::after,
-  .glass-2-raised::after,
-  .glass-2-overlay::after {
+  .lg.lg-press {
+    transition: none;
+  }
+  .lg.lg-press:active {
+    transform: none;
+  }
+  .lg::after {
     opacity: 0 !important;
     transition: none;
   }
+}
 
-  .glass-refract.refract-on::before {
-    filter: none;
+/* Boosted state — content scrolled beneath (scroll-linked glass
+   strengthening, as in iOS). More blur + deeper shadow. */
+.lg.lg-boosted {
+  -webkit-backdrop-filter: var(
+    --lg-backdrop,
+    blur(max(24px, var(--lg-blur, 2px))) saturate(1.9) brightness(1.02)
+  );
+  backdrop-filter: var(
+    --lg-backdrop,
+    blur(max(24px, var(--lg-blur, 2px))) saturate(1.9) brightness(1.02)
+  );
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / calc(0.5 * var(--lg-rim, 1))),
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.12),
+    inset 0 0 18px rgb(255 255 255 / 0.05),
+    0 14px 38px rgb(0 0 0 / 0.28),
+    0 3px 8px rgb(0 0 0 / 0.16);
+}
+
+/* Selected segment — inner lighter glass capsule (no backdrop-filter:
+   sits inside the parent LiquidGlass, never glass-on-glass). */
+.lg-selected {
+  background: rgb(255 255 255 / 0.18);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.4),
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.18),
+    0 1px 4px rgb(0 0 0 / 0.18);
+}
+
+[data-surface='light'] .lg-selected {
+  background: rgb(255 255 255 / 0.55);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.8),
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.6),
+    0 1px 4px rgb(66 92 88 / 0.2);
+}
+
+/* ================================================================== */
+/* CONTENT LAYER — flat Surface material                                */
+/* ================================================================== */
+
+/* Workhorse cards: blur(22px) saturate(1.4), light tint, hairline,
+   soft shadow. Flatter than .lg on purpose. */
+.surface,
+.glass {
+  background-color: rgb(255 255 255 / var(--surface-tint-a, 0.1));
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  backdrop-filter: blur(22px) saturate(1.4);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
+}
+
+/* Raised surface — one feature surface per view (AI briefing card). */
+.surface-strong,
+.glass-strong {
+  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.03));
+  -webkit-backdrop-filter: blur(26px) saturate(1.45);
+  backdrop-filter: blur(26px) saturate(1.45);
+  border: 1px solid rgb(255 255 255 / 0.14);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    0 10px 30px rgb(0 0 0 / 0.16);
+}
+
+/* Subtle — chips, pills, inline controls. PLAIN FILL (no backdrop
+   filter): these sit on top of cards and inside scrolling rows. */
+.surface-subtle,
+.glass-subtle {
+  background-color: rgb(255 255 255 / 0.08);
+  border: 1px solid rgb(255 255 255 / 0.1);
+}
+
+/* Overlay — modals / sheets (settings, command palette): content
+   surfaces that must be highly legible. Still flat. */
+.surface-overlay {
+  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.16));
+  -webkit-backdrop-filter: blur(30px) saturate(1.5);
+  backdrop-filter: blur(30px) saturate(1.5);
+  border: 1px solid rgb(255 255 255 / 0.14);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    0 24px 64px -12px rgb(0 0 0 / 0.5),
+    0 4px 12px rgb(0 0 0 / 0.2);
+}
+
+/* Light scenes: milkier white + faint dark undertone + ink hairline. */
+[data-surface='light'] .surface,
+[data-surface='light'] .glass {
+  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.12));
+  border: 1px solid rgb(14 42 46 / 0.1);
+  box-shadow: 0 6px 20px rgb(66 92 88 / 0.14);
+}
+
+[data-surface='light'] .surface-strong,
+[data-surface='light'] .glass-strong {
+  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.2));
+  border: 1px solid rgb(14 42 46 / 0.12);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.6),
+    0 10px 30px rgb(66 92 88 / 0.18);
+}
+
+[data-surface='light'] .surface-subtle,
+[data-surface='light'] .glass-subtle {
+  background-color: rgb(255 255 255 / 0.42);
+  border: 1px solid rgb(14 42 46 / 0.1);
+}
+
+[data-surface='light'] .surface-overlay {
+  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.34));
+  border: 1px solid rgb(14 42 46 / 0.12);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.7),
+    0 24px 64px -12px rgb(66 92 88 / 0.38),
+    0 4px 12px rgb(66 92 88 / 0.18);
+}
+
+/* Hover — fill brightens (Surface is not pressable glass; buttons
+   inside cards get their own treatment). */
+.surface-hover,
+.glass-hover {
+  transition:
+    background-color 250ms var(--ease-soft, ease),
+    border-color 250ms var(--ease-soft, ease),
+    box-shadow 250ms var(--ease-soft, ease);
+}
+
+.surface-hover:hover,
+.glass-hover:hover {
+  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.06));
+  border-color: rgb(255 255 255 / 0.2);
+}
+
+[data-surface='light'] .surface-hover:hover,
+[data-surface='light'] .glass-hover:hover {
+  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.18));
+  border-color: rgb(14 42 46 / 0.16);
+}
+
+/* ------------------------------------------------------------------ */
+/* <Glass> component classes — map onto the Surface recipes            */
+/* (cards; overlay = modals). The component no longer renders          */
+/* specular / refraction layers — content is flat by design.           */
+/* ------------------------------------------------------------------ */
+
+.glass-2-base {
+  /* identical to .surface (kept as a separate class so <Glass> can
+     evolve independently of raw .glass usages) */
+  background-color: rgb(255 255 255 / var(--surface-tint-a, 0.1));
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  backdrop-filter: blur(22px) saturate(1.4);
+  border: 1px solid rgb(255 255 255 / 0.12);
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
+}
+
+.glass-2-raised {
+  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.03));
+  -webkit-backdrop-filter: blur(26px) saturate(1.45);
+  backdrop-filter: blur(26px) saturate(1.45);
+  border: 1px solid rgb(255 255 255 / 0.14);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    0 10px 30px rgb(0 0 0 / 0.16);
+}
+
+.glass-2-overlay {
+  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.16));
+  -webkit-backdrop-filter: blur(30px) saturate(1.5);
+  backdrop-filter: blur(30px) saturate(1.5);
+  border: 1px solid rgb(255 255 255 / 0.14);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    0 24px 64px -12px rgb(0 0 0 / 0.5),
+    0 4px 12px rgb(0 0 0 / 0.2);
+}
+
+[data-surface='light'] .glass-2-base {
+  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.12));
+  border: 1px solid rgb(14 42 46 / 0.1);
+  box-shadow: 0 6px 20px rgb(66 92 88 / 0.14);
+}
+
+[data-surface='light'] .glass-2-raised {
+  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.2));
+  border: 1px solid rgb(14 42 46 / 0.12);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.6),
+    0 10px 30px rgb(66 92 88 / 0.18);
+}
+
+[data-surface='light'] .glass-2-overlay {
+  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.34));
+  border: 1px solid rgb(14 42 46 / 0.12);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.7),
+    0 24px 64px -12px rgb(66 92 88 / 0.38),
+    0 4px 12px rgb(66 92 88 / 0.18);
+}
+
+/* ================================================================== */
+/* Text vibrancy on scene / glass — white tiers (1.0 / .72 / .5)        */
+/* Never dark text on a dark scene.                                    */
+/* ================================================================== */
+
+.text-on-scene {
+  color: rgb(255 255 255 / 1);
+  text-shadow: 0 2px 24px rgb(0 0 0 / 0.18);
+}
+
+.text-on-scene-2 {
+  color: rgb(255 255 255 / 0.72);
+  text-shadow: 0 1px 16px rgb(0 0 0 / 0.16);
+}
+
+.text-on-scene-3 {
+  color: rgb(255 255 255 / 0.5);
+  text-shadow: 0 1px 12px rgb(0 0 0 / 0.14);
+}
+
+/* Scene-aware hero scrim — sits over the scene canvas, under the hero
+   text. Light scenes get a deeper top gradient so white text passes
+   AA (Apple Weather approach: darken the sky, keep the text white). */
+.hero-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgb(0 0 0 / 0.18),
+    rgb(0 0 0 / 0.05) 30%,
+    transparent 48%
+  );
+}
+
+[data-surface='light'] .hero-scrim {
+  background: linear-gradient(
+    to bottom,
+    rgb(6 24 26 / 0.44),
+    rgb(6 24 26 / 0.22) 26%,
+    rgb(6 24 26 / 0.04) 52%,
+    transparent 68%
+  );
+}
+
+/* Bottom edge scrim — keeps the floating dock legible over bright
+   scene bottoms without adding a translucent layer. */
+.dock-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    rgb(4 16 16 / 0.38),
+    rgb(4 16 16 / 0.1) 60%,
+    transparent
+  );
+}
+
+[data-surface='light'] .dock-scrim {
+  background: linear-gradient(
+    to top,
+    rgb(6 24 26 / 0.3),
+    rgb(6 24 26 / 0.06) 60%,
+    transparent
+  );
+}
+
+/* ================================================================== */
+/* Card label typography — sentence case, 13px, no tracked caps         */
+/* ================================================================== */
+
+.card-label {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--surface-text);
+}
+
+.card-label-muted {
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--surface-muted);
+}
+
+/* ================================================================== */
+/* Reduced transparency — system setting forces fully tinted materials  */
+/* (the JS pipeline already pins the slider at 100; this belt ensures  */
+/* anything that missed the vars still renders legibly).               */
+/* ================================================================== */
+
+@media (prefers-reduced-transparency: reduce) {
+  .lg,
+  .surface,
+  .glass,
+  .glass-strong,
+  .glass-2-base,
+  .glass-2-raised,
+  .glass-2-overlay,
+  .surface-overlay {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .lg {
+    background-color: rgb(16 38 40 / 0.92);
+  }
+
+  [data-surface='light'] .lg {
+    background-color: rgb(240 248 245 / 0.96);
+    color: #0e2a2e;
+  }
+
+  .lg::before {
+    background: linear-gradient(
+      135deg,
+      rgb(255 255 255 / 0.5) 0%,
+      rgb(255 255 255 / 0.1) 24%,
+      rgb(255 255 255 / 0.1) 76%,
+      rgb(255 255 255 / 0.5) 100%
+    );
   }
 }

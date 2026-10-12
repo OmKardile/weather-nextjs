@@ -8,14 +8,14 @@ Aether is a ground-up rebuild of [OmKardile/weather-nextjs](https://github.com/O
 
 ## Features
 
-**Liquid Glass design system (macOS Tahoe)** — a `<Glass>` primitive with three elevation levels (*base* cards / *raised* hero / *overlay* palette & dock), pointer-following specular light, a fractal-noise grain, and a Chromium-only refraction sheen. Every glass surface is tinted by the live weather via `[data-tint]`, and shadcn/ui variables are scene-aware, so dialogs, palettes and toasts match the sky behind them.
+**Liquid Glass design system (macOS Tahoe)** — a two-layer iOS 27 material system — `<LiquidGlass>` controls (runtime 3-pass RGB refraction, opposing-corner rim light, press gel, ≤3 lens filters) over flat `<Glass>`/Surface content cards, with a hero composed directly on the sky. Every surface adapts to the live weather via `[data-tint]`/`[data-surface]`, and a Settings transparency slider (Ultra Clear → Fully Tinted) drives tint, blur, refraction and rim brightness.
 
 **macOS window layout**
 - Slim menu bar whose center morphs from city + live clock into a compact icon + temp + condition chip as the hero scrolls away (iOS Weather behavior)
 - Translucent cities sidebar (desktop) with live temperatures, weather icons and 12-hour temperature sparklines
 - **⌘K / Ctrl+K Spotlight command palette** — live city search, saved cities, actions, card customization and jump-to-section navigation, fully keyboard-driven
 - AI inspector column (xl) / floating overlay (lg) / mobile tab — the same grounded chat panel in every breakpoint
-- Mobile: a floating glass dock (Today / Cities / Ask AI / Settings) plus a snap-point forecast drawer (peek / half / full) that lets the hero scroll behind it
+- Mobile: a floating Liquid Glass capsule dock (Today / Map / Ask AI / Cities / Settings) with a morphing selection capsule, plus a snap-point forecast drawer (peek / half / full) whose content always clears the dock
 - Scene-driven theming: the interface follows the live sky at the selected city — dawn, day, dusk and night re-skin every glass surface (no manual dark mode to get wrong)
 
 **AI, grounded in your forecast** (server-side only, [details below](#ai-features))
@@ -160,25 +160,54 @@ Optional — see `.env.example`:
 
 ## Design system
 
-**Glass levels** — `import { Glass } from '@/components/glass/Glass'`:
+### Liquid Glass (iOS 27 / WWDC26)
+
+The material system is a faithful two-layer implementation of Apple's Liquid Glass:
+
+**Layer 1 — CONTROL (`<LiquidGlass>`)**. True lensing glass for controls only: the top-bar cluster, unit toggle, dock, segmented controls, sheet grabber, map controls and floating buttons. Four stacked layers per element:
+
+1. **Backdrop** — Chromium: `backdrop-filter: url(#refraction-filter) blur(2px) saturate(1.7) brightness(1.05)`; everyone else: `blur(18px+) saturate(1.8)` (clean fallback, zero layout shift).
+2. **Refraction filter** — generated at runtime (`src/lib/liquid.ts`): a displacement map rasterized on a canvas from a rounded-rect signed-distance field (squircle profile ≈ Snell's law, IOR ~1.5, 12–20px bezel, zero displacement at center so content stays crisp), fed through **three feDisplacementMap passes isolated per RGB channel** (scales 1.00 / 1.05 / 1.10) recombined with `feBlend screen` — the faint chromatic fringe at the rim. Filter region extends −20 %/+140 %. Cached by (w, h, radius), regenerated on resize, and **budgeted to ≤ 3 live filters** (dock, top-bar cluster, one more).
+3. **Tint** — very light and scene-luminance aware: dark scenes `rgba(255,255,255,.05–.10)`, light scenes `.18–.28` + 4 % black. Never above 0.3 at default.
+4. **Edge + light** — a 1px **opposing-corner rim** (bright ~.6 top-left *and* bottom-right, faint ~.08 on the other corners) via mask, `inset 0 1px 0 rgba(255,255,255,.5)` top highlight, inner hairline, soft inner glow; a pointer-following specular blob (rAF-throttled, desktop only, off under reduced motion); layered shadow `0 10px 30px / 0 2px 6px` that **intensifies while content scrolls beneath** (`.lg-boosted`).
+
+**Interaction** — press = scale .96 + brighten (gel flex), release springs back with a small overshoot. Selected segments (unit toggle, dock tabs, segmented controls) are an **inner lighter glass capsule** that morphs between positions with a framer-motion `layoutId` spring and a brief `scaleX` stretch mid-travel.
+
+**Variants** — `regular` everywhere; `clear` **only** for controls floating over the full-screen map (with a built-in dimming scrim). Never mixed in one view.
+
+**Layer 2 — CONTENT (Surface)**. All cards are deliberately flat: `blur(22px) saturate(1.4)`, tint `.08–.14` (dark scenes), 1px hairline, soft shadow — no refraction, no specular, so controls pop above it. Chips and scrolling-list rows (`.glass-subtle` / `.surface-subtle`) are **plain fills with no backdrop-filter**. Never glass-on-glass; never more than 2 stacked translucent layers.
+
+**The transparency slider** (Settings → *Liquid Glass*) spans **Ultra Clear → Fully Tinted** and drives everything: tint alpha `.04 → .55`, blur `2px → 28px`, refraction strength `1.0 → 0.25`, rim brightness `1.0 → 0.35`, plus the Surface card tint. It honors `prefers-reduced-transparency` (forces fully tinted, no refraction), `prefers-contrast: more` (stronger rim + tint), `prefers-reduced-motion` (no specular / gel), and a **Reduce bright effects** toggle (kills specular + chromatic fringe).
+
+**Hero** — no panel at all: city, a giant thin temperature (`clamp(104px, 24vw, 176px)`, weight 200, tracking −0.045em, white with soft text-shadow), condition and H/L render **directly on the animated scene**, with the glowing weather glyph (~200px) beside them and quick stats as a row of Surface chips. A scene-aware scrim (stronger on light skies) keeps the white text AA.
+
+**Browser support**
+
+| Browser | Refraction | Backdrop | Notes |
+| --- | --- | --- | --- |
+| Chrome / Edge / Brave (Chromium) | ✅ 3-pass RGB displacement + chromatic rim | `url(#filter) + blur(2px)` | Full recipe |
+| Safari (WebKit) | ❌ (renders nothing for `backdrop-filter: url()` — detection is UA-based, never `CSS.supports`) | `blur(18px+) saturate(1.8)` | Clean frosted fallback |
+| Firefox | ❌ | `blur(18px+) saturate(1.8)` | Same fallback |
+
+**Performance rules** — ≤ 6 live backdrop-filter control elements on screen (audited); ≤ 3 refraction filters (slot budget with graceful blur fallback); card sections keep `content-visibility` virtualization; no backdrop filter on scrolling list rows; pointer specular is rAF-throttled and hover-capable-pointer-only.
+
+**Scene scenery** — every scene paints large soft light blobs, a diagonal gradient band and small high-contrast orbs near the **top and bottom edges** (calm middle for text), so the lensing has living light to bend. Blobs drift slowly; everything is seeded-random and SSR-stable.
 
 ```tsx
-<Glass level="base" className="rounded-3xl p-5">…</Glass>       // cards (workhorse)
-<Glass level="raised" refract>…</Glass>                          // hero / one feature surface per view
-<Glass level="overlay" as="nav">…</Glass>                        // palette, dock, modals, menus
+import { LiquidGlass } from '@/components/glass/LiquidGlass';
+import { Glass } from '@/components/glass/Glass';
+import { SegmentedControl } from '@/components/glass/SegmentedControl';
+
+<LiquidGlass className="flex h-11 items-center rounded-full px-3">…</LiquidGlass>   // control
+<LiquidGlass as="button" onClick={…} aria-label="Save">…</LiquidGlass>             // pressable control
+<LiquidGlass variant="clear">…</LiquidGlass>                                       // over the map only
+<Glass level="base" className="rounded-[var(--radius-card)] p-5">…</Glass>        // content card
+<SegmentedControl aria-label="View" options={…} value={view} onChange={setView} />
 ```
 
-| Level | Backdrop | Use for |
-| --- | --- | --- |
-| `base` | blur 16 · saturate 150 · 6 % tint | Cards, chips, list rows |
-| `raised` | blur 24 · saturate 165 · 10 % tint | The hero card (one per view) |
-| `overlay` | blur 36 · saturate 180 · near-opaque | Command palette, dock, dialogs, dropdowns |
+The legacy utility classes (`.glass`, `.glass-strong`, `.glass-subtle`, `.glass-hover`, `.surface-*`) now map onto the Surface recipes — migrated components keep working.
 
-Every level layers a gradient hairline edge, a top specular highlight, a fractal-noise grain, and a pointer-following specular sheen (`specular` prop, auto-disabled on touch devices and under `prefers-reduced-motion`). `refract` adds the liquid refraction sheen — gated to Chromium via hydration-safe UA detection; Safari/Firefox silently get plain glass. The shared SVG filter is rendered by exactly one instance per page.
-
-**Glass rules** (enforced by convention, documented in `glass.css`): at most ~6 backdrop-filter layers per screen; glass-on-glass nesting ≤ 2; no blur on long scrolling lists (use plain fills); `.glass-scrim` under text for AA legibility on busy scenes; concentric radii (outer − padding); don't stack Tailwind border/background/shadow utilities on glass elements — restyle via the `--glass-*` custom properties. The legacy utility classes from v1 (`.glass`, `.glass-strong`, `.glass-subtle`, `.glass-hover`) remain available for migrated components.
-
-**Scene tinting** — `AetherApp` sets `data-tint="<condition>"` on the app root; `globals.css` maps each of the 8 conditions to a `--glass-tint` RGB triplet that the glass recipes `color-mix` into their fills. Under `[data-surface="light"]` the shadcn variables are re-mapped too, so overlaid UI matches the sky in both light and dark scenes.
+**Text on glass** — vibrancy tiers (white at 1.0 / .72 / .5) on scene and controls via `.text-on-scene` / `-2` / `-3`; on cards via the `--surface-*` tokens. Labels are sentence-case 13px (`.card-label` / `.card-label-muted`) — no tracked-out micro caps. Dark text never sits on a dark scene; the scene scrim guarantees AA.
 
 **Icon system** — `import { Icon } from '@/components/icons/Icon'`:
 
@@ -188,7 +217,7 @@ Every level layers a gradient hairline edge, a top specular highlight, a fractal
 ```
 
 - **12 weather glyphs** (64×64, filled, gradient-lit): `sun`, `moon`, `partly-cloudy-day`, `partly-cloudy-night`, `cloudy`, `fog`, `drizzle`, `rain`, `thunder`, `snow`, `wind`, `hail`
-- **26 UI icons** (24×24, currentColor, round caps/joins): `search`, `pin`, `gear`, `plus`, `check`, `x`, `chevron-up/down/left/right`, `sparkle`, `droplet`, `thermometer`, `eye`, `gauge`, `sunrise`, `sunset`, `bookmark`, `send`, `stop`, `refresh`, `locate`, `command`, `info`, `alert`, `moon-phase`
+- **27 UI icons** (24×24, currentColor, round caps/joins): `search`, `pin`, `gear`, `plus`, `check`, `x`, `chevron-up/down/left/right`, `sparkle`, `droplet`, `thermometer`, `eye`, `gauge`, `sunrise`, `sunset`, `bookmark`, `send`, `stop`, `refresh`, `locate`, `command`, `info`, `alert`, `moon-phase`, `compare`
 - Gradient/mask/clip ids are namespaced with React `useId()`, so dozens of icons can share a page (hourly strip) without collisions; a shared IntersectionObserver pauses off-screen animations; `prefers-reduced-motion` renders everything static.
 
 **Adding a scene** — add a config to `src/lib/scenes.ts` (`getScene(condition, phase)` maps WMO codes × day phases to `SceneConfig`: gradient stops, surface mode, layer flags). The scene engine, glass tint and light/dark surface tokens all derive from it — no component changes needed. Test with `?scene=<condition>&phase=<phase>` (see [Debug & QA](#debug--qa)).

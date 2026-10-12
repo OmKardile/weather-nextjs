@@ -22,6 +22,8 @@ interface CitiesSidebarProps {
   onLocate: () => void;
   locating: boolean;
   onAddCity: () => void;
+  /** Open the compare-cities dialog (≥2 saved cities). */
+  onCompare: () => void;
   className?: string;
 }
 
@@ -135,6 +137,7 @@ export function CitiesSidebar({
   onLocate,
   locating,
   onAddCity,
+  onCompare,
   className,
 }: CitiesSidebarProps) {
   return (
@@ -145,18 +148,31 @@ export function CitiesSidebar({
       className={cn('hidden w-72 shrink-0 flex-col rounded-none border-x-0 border-y-0 lg:flex', className)}
     >
       <div className="flex items-center justify-between px-4 pb-2 pt-4">
-        <h2 className="text-[11px] font-semibold uppercase tracking-[0.16em] text-surface-muted">
+        <h2 className="card-label">
           Cities
         </h2>
-        <button
-          type="button"
-          onClick={onAddCity}
-          aria-label="Add a city"
-          title="Add a city (⌘K)"
-          className="glass-subtle focus-ring flex h-7 w-7 items-center justify-center rounded-full text-surface-muted transition-colors hover:text-surface"
-        >
-          <Icon name="plus" size={14} />
-        </button>
+        <div className="flex items-center gap-1">
+          {cities.length >= 2 && (
+            <button
+              type="button"
+              onClick={onCompare}
+              aria-label="Compare saved cities"
+              title="Compare cities"
+              className="surface-subtle focus-ring flex h-7 w-7 items-center justify-center rounded-full text-surface-muted transition-colors hover:text-surface"
+            >
+              <Icon name="compare" size={14} />
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onAddCity}
+            aria-label="Add a city"
+            title="Add a city (⌘K)"
+            className="glass-subtle focus-ring flex h-7 w-7 items-center justify-center rounded-full text-surface-muted transition-colors hover:text-surface"
+          >
+            <Icon name="plus" size={14} />
+          </button>
+        </div>
       </div>
 
       <div className="scroll-slim flex-1 space-y-1.5 overflow-y-auto px-3 pb-3">

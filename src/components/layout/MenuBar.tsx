@@ -5,6 +5,7 @@ import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Logo } from '@/components/brand/Logo';
 import { Icon } from '@/components/icons/Icon';
 import { WeatherIcon } from '@/components/weather/WeatherIcon';
+import { LiquidGlass } from '@/components/glass/LiquidGlass';
 import { toggleAmbientSound } from '@/hooks/use-ambient-sound';
 import { usePreferences } from '@/hooks/use-preferences';
 import { formatLocalClock } from '@/lib/time';
@@ -15,9 +16,13 @@ import type { City, Units, WeatherBundle } from '@/types/weather';
 import { cn } from '@/lib/utils';
 
 /* ================================================================== */
-/* MenuBar — macOS-style top bar.                                      */
-/* Center morphs from city + local clock to a compact weather summary  */
-/* once the hero scrolls out of view (iOS Weather behavior).           */
+/* MenuBar — floating transparent top chrome (iOS 27).                 */
+/*                                                                     */
+/* NO solid bar: logo floats left, city + time center as plain white   */
+/* text on the scene, and every control lives in ONE grouped           */
+/* LiquidGlass capsule on the right (unit toggle + icon buttons,       */
+/* 44px targets, 20px glyphs, full-opacity white). The capsule's       */
+/* glass strengthens (lg-boosted) while content scrolls beneath it.    */
 /* ================================================================== */
 
 interface MenuBarProps {
@@ -47,49 +52,19 @@ function useHydrated(): boolean {
   );
 }
 
-function UnitToggle({ units, onToggle }: { units: Units; onToggle: () => void }) {
-  return (
-    <div
-      role="group"
-      aria-label="Temperature units"
-      className="glass-subtle flex h-8 items-center rounded-full p-0.5"
-    >
-      {(['metric', 'imperial'] as const).map((option) => {
-        const active = units === option;
-        return (
-          <button
-            key={option}
-            type="button"
-            aria-pressed={active}
-            onClick={active ? undefined : onToggle}
-            className={cn(
-              'focus-ring tnum h-7 min-w-8 rounded-full px-2 text-xs font-semibold transition-all duration-200',
-              active
-                ? 'bg-aurora-500 text-[#04211C] shadow-[0_0_14px_-4px_rgb(34_188_160/0.8)]'
-                : 'text-surface-muted hover:text-surface',
-            )}
-          >
-            {option === 'metric' ? '°C' : '°F'}
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-function IconActionButton({
+function ClusterButton({
   label,
-  icon,
   onClick,
   active,
   disabled,
+  children,
   className,
 }: {
   label: string;
-  icon: React.ReactNode;
   onClick: () => void;
   active?: boolean;
   disabled?: boolean;
+  children: React.ReactNode;
   className?: string;
 }) {
   return (
@@ -101,12 +76,12 @@ function IconActionButton({
       aria-pressed={active}
       title={label}
       className={cn(
-        'glass-subtle focus-ring flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 hover:bg-[var(--surface-strong)] disabled:opacity-60',
-        active && 'border-aurora-500/50 bg-aurora-500/15 text-aurora-400',
+        'focus-ring flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors duration-200 disabled:opacity-60',
+        active && 'bg-white/16',
         className,
       )}
     >
-      {icon}
+      {children}
     </button>
   );
 }
@@ -142,119 +117,153 @@ export function MenuBar({
 
   return (
     <header className="sticky top-0 z-40 shrink-0">
-      <div className="glass border-x-0 border-t-0">
-        <div className="mx-auto flex h-12 w-full items-center gap-2 px-3 sm:px-5 lg:h-[52px]">
-          {/* Left — brand */}
-          <Logo className="shrink-0 [&>span:last-child]:hidden sm:[&>span:last-child]:inline" />
+      <div className="mx-auto flex h-14 w-full items-center gap-2 px-3 sm:px-5 lg:h-[60px]">
+        {/* Left — brand, floating free on the scene */}
+        <Logo className="shrink-0 [&>span:last-child]:hidden sm:[&>span:last-child]:inline" />
 
-          {/* Center — city morph (clock ⇄ compact weather) */}
-          <div className="relative flex h-full min-w-0 flex-1 items-center justify-center">
-            <AnimatePresence mode="popLayout" initial={false}>
-              {!city ? (
-                <motion.p
-                  key="tagline"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -6 }}
-                  transition={springs.snappy}
-                  className="hidden truncate text-sm text-surface-muted sm:block"
-                >
-                  Weather, elevated.
-                </motion.p>
-              ) : showCompact && bundle ? (
-                <motion.div
-                  key="compact"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={springs.snappy}
-                  className="flex min-w-0 items-center gap-2"
-                >
-                  <WeatherIcon
-                    condition={bundle.current.condition}
-                    isDay={bundle.current.isDay}
-                    size={24}
-                  />
-                  <span className="truncate text-sm font-semibold text-surface">{city.name}</span>
-                  <span className="tnum text-sm font-semibold text-surface">
-                    {formatTemp(bundle.current.temperature, units)}
-                  </span>
-                  <span className="hidden truncate text-xs text-surface-muted sm:block">
-                    {conditionLabel(bundle.current.weatherCode)}
-                  </span>
-                </motion.div>
-              ) : (
-                <motion.div
-                  key="clock"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  transition={springs.snappy}
-                  className="flex min-w-0 items-center gap-2"
-                >
-                  <span className="truncate text-sm font-semibold text-surface">{city.name}</span>
-                  {clock && (
-                    <>
-                      <span aria-hidden="true" className="text-surface-faint">
-                        ·
-                      </span>
-                      <span className="tnum text-sm text-surface-muted">{clock}</span>
-                    </>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Right — controls */}
-          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
-            <IconActionButton
-              label="Use my location"
-              icon={<Icon name="locate" size={17} animated />}
-              onClick={onLocate}
-              disabled={locating}
-              className="hidden lg:flex"
-            />
-            <UnitToggle units={units} onToggle={onToggleUnits} />
-            <IconActionButton
-              label={ambientEnabled ? 'Mute ambient sound' : 'Play ambient sound'}
-              icon={<Icon name="volume" size={17} />}
-              onClick={toggleAmbientSound}
-              active={hydrated && ambientEnabled}
-            />
-            <button
-              type="button"
-              onClick={onOpenPalette}
-              aria-label="Search and commands"
-              aria-keyshortcuts="Meta+K Control+K"
-              className="glass-subtle focus-ring flex h-9 items-center gap-2 rounded-full px-3 text-sm text-surface-muted transition-all duration-200 hover:bg-[var(--surface-strong)] hover:text-surface"
-            >
-              <Icon name="search" size={16} />
-              <span className="hidden xl:inline">Search</span>
-              <kbd className="hidden rounded-md border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-1.5 py-0.5 text-[10px] font-medium text-surface-faint xl:inline">
-                ⌘K
-              </kbd>
-            </button>
-            <IconActionButton
-              label={aiOpen ? 'Close Ask AI' : 'Ask AI'}
-              icon={<Icon name="sparkle" size={17} animated />}
-              onClick={onToggleAi}
-              active={aiOpen}
-            />
-            <IconActionButton
-              label={mapOpen ? 'Close map' : 'Open map'}
-              icon={<Icon name="map" size={17} animated />}
-              onClick={onToggleMap}
-              active={mapOpen}
-            />
-            <IconActionButton
-              label="Settings"
-              icon={<Icon name="gear" size={17} />}
-              onClick={onOpenSettings}
-              className="hidden lg:flex"
-            />
-          </div>
+        {/* Center — city + time (or compact weather when scrolled) */}
+        <div className="relative flex h-full min-w-0 flex-1 items-center justify-center">
+          <AnimatePresence mode="popLayout" initial={false}>
+            {!city ? (
+              <motion.p
+                key="tagline"
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={springs.snappy}
+                className="text-on-scene-2 hidden truncate text-[15px] sm:block"
+              >
+                Weather, elevated.
+              </motion.p>
+            ) : showCompact && bundle ? (
+              <motion.div
+                key="compact"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={springs.snappy}
+                className="text-on-scene flex min-w-0 items-center gap-2"
+              >
+                <WeatherIcon
+                  condition={bundle.current.condition}
+                  isDay={bundle.current.isDay}
+                  size={24}
+                />
+                <span className="truncate text-[15px] font-semibold">{city.name}</span>
+                <span className="tnum text-[15px] font-semibold">
+                  {formatTemp(bundle.current.temperature, units)}
+                </span>
+                <span className="text-on-scene-2 hidden truncate text-[13px] sm:block">
+                  {conditionLabel(bundle.current.weatherCode)}
+                </span>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="clock"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={springs.snappy}
+                className="text-on-scene flex min-w-0 items-center gap-2"
+              >
+                <span className="truncate text-[15px] font-semibold">{city.name}</span>
+                {clock && (
+                  <>
+                    <span aria-hidden="true" className="text-on-scene-3">
+                      ·
+                    </span>
+                    <span className="text-on-scene-2 tnum text-[14px]">{clock}</span>
+                  </>
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
+
+        {/* Right — ONE grouped Liquid Glass capsule with every control */}
+        <LiquidGlass
+          refract
+          className={cn(
+            'flex shrink-0 items-center gap-0.5 rounded-full p-1 transition-shadow duration-300',
+            scrolled && 'lg-boosted',
+          )}
+        >
+          <ClusterButton
+            label="Use my location"
+            onClick={onLocate}
+            disabled={locating}
+            className="hidden lg:flex"
+          >
+            <Icon name="locate" size={20} animated />
+          </ClusterButton>
+
+          {/* Unit toggle — inner selected capsule (no separate glass) */}
+          <div
+            role="group"
+            aria-label="Temperature units"
+            className="flex h-11 items-center p-0.5"
+          >
+            {(['metric', 'imperial'] as const).map((option) => {
+              const active = units === option;
+              return (
+                <button
+                  key={option}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={active ? undefined : onToggleUnits}
+                  className={cn(
+                    'focus-ring tnum relative flex h-10 min-w-10 items-center justify-center rounded-full px-2 text-[13px] font-semibold transition-colors duration-200',
+                    active ? 'text-white' : 'text-white/70 hover:text-white',
+                  )}
+                >
+                  {active && (
+                    <motion.span
+                      layoutId="unit-toggle-pill"
+                      initial={false}
+                      animate={{ scaleX: [1.1, 1] }}
+                      transition={{
+                        ...springs.snappy,
+                        scaleX: { duration: 0.24, ease: 'easeOut' },
+                      }}
+                      className="lg-selected absolute inset-0 rounded-full"
+                      aria-hidden="true"
+                    />
+                  )}
+                  <span className="relative">{option === 'metric' ? '°C' : '°F'}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <ClusterButton
+            label={ambientEnabled ? 'Mute ambient sound' : 'Play ambient sound'}
+            onClick={toggleAmbientSound}
+            active={hydrated && ambientEnabled}
+            className="hidden sm:flex"
+          >
+            <Icon name="volume" size={20} />
+          </ClusterButton>
+          <ClusterButton label="Search and commands" onClick={onOpenPalette}>
+            <Icon name="search" size={20} />
+          </ClusterButton>
+          <ClusterButton
+            label={aiOpen ? 'Close Ask AI' : 'Ask AI'}
+            onClick={onToggleAi}
+            active={aiOpen}
+          >
+            <Icon name="sparkle" size={20} animated />
+          </ClusterButton>
+          <ClusterButton
+            label={mapOpen ? 'Close map' : 'Open map'}
+            onClick={onToggleMap}
+            active={mapOpen}
+          >
+            <Icon name="map" size={20} animated />
+          </ClusterButton>
+          <ClusterButton label="Settings" onClick={onOpenSettings} className="hidden lg:flex">
+            <Icon name="gear" size={20} />
+          </ClusterButton>
+        </LiquidGlass>
       </div>
     </header>
   );

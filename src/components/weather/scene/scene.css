@@ -340,3 +340,80 @@
     opacity: 0;
   }
 }
+
+/* ---- Light blobs (Liquid Glass scenery) ------------------------------------ */
+
+/* Large soft glows near the top/bottom edges — drift very slowly so the
+   refraction under the dock / top capsule has living light to bend.
+   The middle of the screen stays calm for text. */
+.scene-blob {
+  position: absolute;
+  width: clamp(280px, 58vmin, 720px);
+  height: clamp(280px, 58vmin, 720px);
+  border-radius: 50%;
+  filter: blur(52px);
+  opacity: 0.34;
+  mix-blend-mode: screen;
+  animation: blob-drift var(--blob-dur, 60s) ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+.scene-blob-b { opacity: 0.26; }
+.scene-blob-c { opacity: 0.3; }
+.scene-blob-d { opacity: 0.22; }
+
+@keyframes blob-drift {
+  from {
+    transform: translate3d(-4%, -2%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(5%, 3.5%, 0) scale(1.14);
+  }
+}
+
+/* Diagonal gradient band — a soft streak of light across the upper sky. */
+.scene-band {
+  position: absolute;
+  inset: -5% -10% auto -10%;
+  height: 58%;
+  filter: blur(28px);
+  opacity: 0.4;
+  mix-blend-mode: screen;
+  transform: rotate(-2deg);
+}
+
+/* Small high-contrast orbs near the edges — bright pins of light the rim
+   light catches as controls slide over them. */
+.scene-orb {
+  position: absolute;
+  width: clamp(56px, 9vmin, 120px);
+  height: clamp(56px, 9vmin, 120px);
+  border-radius: 50%;
+  filter: blur(14px);
+  opacity: 0.5;
+  mix-blend-mode: screen;
+  animation: orb-pulse 9s ease-in-out infinite;
+}
+
+.scene-orb-late {
+  animation-delay: -4.5s;
+}
+
+@keyframes orb-pulse {
+  0%,
+  100% {
+    opacity: 0.36;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.62;
+    transform: scale(1.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-blob,
+  .scene-orb {
+    animation: none;
+  }
+}

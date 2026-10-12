@@ -7,7 +7,7 @@ import { setWorkerUrl } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import type { GeoJSONSource, Map as MLMap, Marker as MLMarker } from 'maplibre-gl';
 import type { FeatureCollection } from 'geojson';
-import { Glass } from '@/components/glass/Glass';
+import { LiquidGlass } from '@/components/glass/LiquidGlass';
 import { Icon } from '@/components/icons/Icon';
 import { usePreferences } from '@/hooks/use-preferences';
 import type { City, GeoQuake, Units } from '@/types/weather';
@@ -696,11 +696,14 @@ export default function MapOverlay({ onClose, city, units, surface }: MapOverlay
       aria-label="Map mode — live weather layers"
       className="fixed inset-0 z-[80] flex flex-col"
     >
-      {/* Top chrome */}
-      <Glass level="overlay" className="relative z-30 flex items-center gap-2 rounded-none px-3 py-2">
+      {/* Top chrome — Clear LiquidGlass over the map (dimming scrim built in) */}
+      <LiquidGlass
+        variant="clear"
+        className="relative z-30 flex items-center gap-2 px-3 py-2"
+      >
         <span
           aria-hidden="true"
-          className="glass-subtle flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-aurora-400"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-aurora-300"
         >
           <Icon name="map" size={18} animated />
         </span>
@@ -717,7 +720,7 @@ export default function MapOverlay({ onClose, city, units, surface }: MapOverlay
           onClick={() => setPickerOpen((open) => !open)}
           aria-label={pickerOpen ? 'Close layers panel' : 'Open layers panel'}
           aria-pressed={pickerOpen}
-          className={`glass-subtle focus-ring flex h-9 w-9 items-center justify-center rounded-full transition-all duration-200 ${
+          className={`focus-ring flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition-all duration-200 ${
             pickerOpen
               ? 'border-aurora-500/50 bg-aurora-500/15 text-aurora-400'
               : 'text-surface-muted hover:text-surface'
@@ -731,11 +734,11 @@ export default function MapOverlay({ onClose, city, units, surface }: MapOverlay
           onClick={onClose}
           aria-label="Close map (Escape)"
           title="Close (Esc)"
-          className="glass-subtle focus-ring flex h-9 w-9 items-center justify-center rounded-full text-surface-muted transition-all duration-200 hover:text-surface"
+          className="focus-ring flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/85 transition-colors duration-200 hover:text-white"
         >
           <Icon name="x" size={17} />
         </button>
-      </Glass>
+      </LiquidGlass>
 
       {/* Map viewport */}
       <div className="aether-map relative min-h-0 flex-1">

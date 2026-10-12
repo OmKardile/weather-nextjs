@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX, KeyboardEvent } from 'react';
 import { AiBadge, MarkdownLite, StreamingCursor } from '@/components/ai/ai-shared';
 import { PlannerPanel } from '@/components/ai/PlannerPanel';
+import { SegmentedControl } from '@/components/glass/SegmentedControl';
 import { Icon } from '@/components/icons/Icon';
 import { useAiChat } from '@/hooks/use-ai-chat';
 import type { UiChatMessage } from '@/hooks/use-ai-chat';
@@ -190,31 +191,13 @@ export function AskAIPanel({ city, units, bundle, className, onClose }: AskAIPan
         </div>
         <div className="mt-1 flex items-center gap-2">
           <p className="min-w-0 flex-1 truncate text-xs text-surface-muted">{contextLine}</p>
-          <div
-            role="group"
+          <SegmentedControl
             aria-label="Ask AI mode"
-            className="glass-subtle flex h-7 shrink-0 items-center rounded-full p-0.5"
-          >
-            {MODES.map((m) => {
-              const active = mode === m.id;
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  aria-pressed={active}
-                  onClick={active ? undefined : () => setMode(m.id)}
-                  className={cn(
-                    'focus-ring h-6 rounded-full px-2.5 text-[11px] font-semibold transition-all duration-200',
-                    active
-                      ? 'bg-aurora-500 text-[#04211C] shadow-[0_0_14px_-4px_rgb(34_188_160/0.8)]'
-                      : 'text-surface-muted hover:text-surface',
-                  )}
-                >
-                  {m.label}
-                </button>
-              );
-            })}
-          </div>
+            options={MODES.map((m) => ({ id: m.id, label: m.label }))}
+            value={mode}
+            onChange={setMode}
+            className="shrink-0"
+          />
         </div>
       </header>
 

@@ -103,7 +103,7 @@ export function EmptyState({ onSelect, onLocate, locating }: EmptyStateProps) {
       </button>
 
       <fieldset className="mt-10 w-full">
-        <legend className="text-[11px] font-semibold uppercase tracking-[0.16em] text-surface-muted">
+        <legend className="card-label">
           Popular right now
         </legend>
         <div className="mt-3 flex flex-wrap justify-center gap-2">

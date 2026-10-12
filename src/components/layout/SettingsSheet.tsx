@@ -1,8 +1,10 @@
 'use client';
 
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { CSSProperties, JSX } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 import { Glass } from '@/components/glass/Glass';
 import { Icon } from '@/components/icons/Icon';
 import { useEditMode } from '@/hooks/use-edit-mode';
@@ -89,6 +91,70 @@ function useHydrated(): boolean {
     emptySubscribe,
     () => true,
     () => false,
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Liquid Glass — transparency slider + Reduce bright effects.         */
+/* Ultra Clear (0) → Fully Tinted (100): drives tint alpha, blur       */
+/* radius, refraction strength and rim brightness across every glass   */
+/* control and card. Honors prefers-reduced-transparency (forced to    */
+/* fully tinted — the slider shows the locked state).                  */
+/* ------------------------------------------------------------------ */
+
+function GlassTransparencyControl(): JSX.Element {
+  const hydrated = useHydrated();
+  const transparency = usePreferences((s) => s.glassTransparency);
+  const setTransparency = usePreferences((s) => s.setGlassTransparency);
+  const [reducedTransparency, setReducedTransparency] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-transparency: reduce)');
+    const update = () => setReducedTransparency(query.matches);
+    update();
+    query.addEventListener('change', update);
+    return () => query.removeEventListener('change', update);
+  }, []);
+
+  const value = reducedTransparency ? 100 : hydrated ? transparency : 0;
+
+  return (
+    <div className="w-full max-w-64">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[11px] font-medium text-surface-faint">Ultra clear</span>
+        <span
+          className="tnum rounded-full bg-[var(--surface-subtle)] px-2 py-0.5 text-[11px] font-semibold text-surface-muted"
+          aria-live="polite"
+        >
+          {reducedTransparency ? 'Reduced transparency on' : `${value}%`}
+        </span>
+        <span className="text-[11px] font-medium text-surface-faint">Fully tinted</span>
+      </div>
+      <Slider
+        value={[value]}
+        onValueChange={([next]: number[]) => setTransparency(next)}
+        min={0}
+        max={100}
+        step={1}
+        aria-label="Liquid Glass transparency"
+        disabled={reducedTransparency}
+        className="mt-2.5"
+      />
+    </div>
+  );
+}
+
+function ReduceBrightEffectsControl(): JSX.Element {
+  const hydrated = useHydrated();
+  const reduceBright = usePreferences((s) => s.reduceBrightEffects);
+  const setReduceBright = usePreferences((s) => s.setReduceBrightEffects);
+
+  return (
+    <Switch
+      checked={hydrated && reduceBright}
+      onCheckedChange={setReduceBright}
+      aria-label="Reduce bright effects"
+    />
   );
 }
 
@@ -321,10 +387,24 @@ export function SettingsContent({
         label="Appearance"
         hint="Aether themes itself from the live sky at your city — dawn, day, dusk and night. No manual dark mode."
       >
-        <span className="glass-subtle inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-surface-muted">
+        <span className="surface-subtle inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-surface-muted">
           <Icon name="sunrise" size={13} aria-hidden="true" />
           Follows the sky
         </span>
+      </SettingsRow>
+
+      <SettingsRow
+        label="Liquid Glass"
+        hint="How clear the glass controls are — from ultra clear with full lensing to fully tinted."
+      >
+        <GlassTransparencyControl />
+      </SettingsRow>
+
+      <SettingsRow
+        label="Reduce bright effects"
+        hint="Turns off the pointer specular highlight and chromatic rim fringe."
+      >
+        <ReduceBrightEffectsControl />
       </SettingsRow>
 
       <SettingsRow label="Card density" hint="Comfortable spacing or a tighter fit">
@@ -385,7 +465,7 @@ export function SettingsContent({
 
       <div className="py-3.5">
         <p className="text-xs leading-relaxed text-surface-faint">
-          Aether 3.0.0 · forecast &amp; air quality by Open-Meteo (CAMS) · geocoding by
+          Aether 3.1.0 · forecast &amp; air quality by Open-Meteo (CAMS) · geocoding by
           Open-Meteo &amp; Nominatim · AI by Gemini
         </p>
       </div>

@@ -117,7 +117,7 @@ function PollenSection({ pollen }: { pollen: Pollen | null | undefined }) {
 
   return (
     <div className="mt-3 border-t border-[var(--surface-border)] pt-3">
-      <p className="flex items-baseline justify-between text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+      <p className="flex items-baseline justify-between card-label">
         Pollen
         <span className="tnum text-[9px] font-normal normal-case tracking-normal text-surface-faint">
           max next 24h
@@ -147,7 +147,7 @@ export function AirQualityCard({ bundle, units }: AirQualityCardProps) {
   if (!air || air.europeanAqi == null) {
     return (
       <div className="glass flex h-full min-h-[168px] flex-col justify-center rounded-[var(--radius-card)] p-5">
-        <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+        <p className="flex items-center gap-1.5 card-label">
           <Leaf className="h-3.5 w-3.5" aria-hidden="true" />
           Air quality
         </p>
@@ -191,7 +191,7 @@ export function AirQualityCard({ bundle, units }: AirQualityCardProps) {
             key={pollutant.label}
             className="glass-subtle rounded-2xl px-3 py-2.5"
           >
-            <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-surface-faint">
+            <p className="card-label-muted">
               {pollutant.label}
             </p>
             <p className="tnum mt-0.5 text-sm font-semibold text-surface">
@@ -277,7 +277,7 @@ function pollenDetail(pollen: Pollen | null): React.ReactNode {
   if (!pollen || !pollen.available) return null;
   return (
     <div className="mt-4 border-t border-[var(--surface-border)] pt-3">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">Pollen</p>
+      <p className="card-label">Pollen</p>
       <div className="tnum mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-surface-muted">
         <span>
           Grass <span className="font-semibold text-surface">{(pollen.grass ?? 0).toFixed(1)}</span> grains/m³

@@ -20,6 +20,9 @@ export type ForecastDays = 7 | 16;
 /** Forecast-section spacing: roomy default vs tighter information density. */
 export type Density = 'comfortable' | 'compact';
 
+/** Liquid Glass transparency: 0 = ultra clear, 100 = fully tinted. */
+export type GlassTransparency = number;
+
 interface PreferencesState {
   units: Units;
   forecastDays: ForecastDays;
@@ -35,6 +38,10 @@ interface PreferencesState {
   hiddenSections: SectionId[];
   /** Forecast-section spacing. */
   density: Density;
+  /** Liquid Glass transparency 0–100 (0 ultra clear → 100 fully tinted). */
+  glassTransparency: GlassTransparency;
+  /** Reduce bright effects: no specular pointer highlight, no chromatic fringe. */
+  reduceBrightEffects: boolean;
   savedCities: City[];
   lastCity: City | null;
   setUnits: (units: Units) => void;
@@ -47,6 +54,8 @@ interface PreferencesState {
   toggleSectionHidden: (id: SectionId) => void;
   restoreAllSections: () => void;
   setDensity: (density: Density) => void;
+  setGlassTransparency: (value: GlassTransparency) => void;
+  setReduceBrightEffects: (enabled: boolean) => void;
   saveCity: (city: City) => void;
   removeCity: (id: number) => void;
   /** Reorder saved cities (new full order, e.g. from a drag-and-drop list). */
@@ -71,6 +80,8 @@ export const usePreferences = create<PreferencesState>()(
       sectionOrder: [...DEFAULT_SECTION_ORDER],
       hiddenSections: [],
       density: 'comfortable',
+      glassTransparency: 0,
+      reduceBrightEffects: false,
       savedCities: [],
       lastCity: null,
 
@@ -98,6 +109,11 @@ export const usePreferences = create<PreferencesState>()(
       restoreAllSections: () => set({ hiddenSections: [] }),
 
       setDensity: (density) => set({ density }),
+
+      setGlassTransparency: (value) =>
+        set({ glassTransparency: Math.round(Math.min(100, Math.max(0, value))) }),
+
+      setReduceBrightEffects: (enabled) => set({ reduceBrightEffects: enabled }),
 
       saveCity: (city) =>
         set((state) =>
@@ -155,6 +171,14 @@ export const usePreferences = create<PreferencesState>()(
       density: (persisted as { density?: Density } | undefined)?.density === 'compact'
         ? 'compact'
         : 'comfortable',
+      glassTransparency: (() => {
+        const value = (persisted as { glassTransparency?: number } | undefined)?.glassTransparency;
+        return typeof value === 'number' && Number.isFinite(value)
+          ? Math.round(Math.min(100, Math.max(0, value)))
+          : current.glassTransparency;
+      })(),
+      reduceBrightEffects:
+        (persisted as { reduceBrightEffects?: boolean } | undefined)?.reduceBrightEffects === true,
     }) },
   ),
 );

@@ -1,7 +1,7 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { Glass } from '@/components/glass/Glass';
+import { LiquidGlass } from '@/components/glass/LiquidGlass';
 import { Icon } from '@/components/icons/Icon';
 import { Switch } from '@/components/ui/switch';
 import { springs } from '@/lib/motion';
@@ -57,8 +57,8 @@ export function LayerPicker({
           transition={springs.snappy}
           className="absolute inset-x-3 bottom-[6.25rem] z-20 lg:inset-x-auto lg:bottom-auto lg:right-4 lg:top-4 lg:w-80"
         >
-          <Glass
-            level="overlay"
+          <LiquidGlass
+            variant="clear"
             role="group"
             aria-label="Map layers"
             className="rounded-3xl p-4"
@@ -115,7 +115,7 @@ export function LayerPicker({
             </ul>
 
             <div className="mt-3 border-t border-[var(--surface-border)] pt-3">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-faint">
+              <p className="mb-2 card-label-muted">
                 Basemap
               </p>
               <div
@@ -148,7 +148,7 @@ export function LayerPicker({
                 Satellite NASA GIBS · Quakes USGS · Grid Open-Meteo
               </p>
             </div>
-          </Glass>
+          </LiquidGlass>
         </motion.div>
       )}
     </AnimatePresence>

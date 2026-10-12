@@ -1,25 +1,26 @@
 'use client';
 
 import { format } from 'date-fns';
-import {
-  ArrowDown,
-  ArrowUp,
-  Bookmark,
-  BookmarkCheck,
-  Droplets,
-  MapPin,
-  RefreshCw,
-  Sunrise,
-  Wind,
-} from 'lucide-react';
+import { Bookmark, BookmarkCheck, Droplets, RefreshCw, Sunrise, Wind } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { WeatherIcon } from '@/components/weather/WeatherIcon';
 import { ShareCardButton } from '@/components/weather/ShareCardButton';
+import { LiquidGlass } from '@/components/glass/LiquidGlass';
 import { formatLocalClock, formatLocalDate } from '@/lib/time';
 import { compassPoint, countryFlag, displayTemp, formatHour, formatTemp, formatWind } from '@/lib/units';
 import { conditionLabel } from '@/lib/wmo';
 import type { City, Units, WeatherBundle } from '@/types/weather';
 import { cn } from '@/lib/utils';
+
+/* ================================================================== */
+/* CurrentWeather — the hero.                                           */
+/*                                                                     */
+/* NO panel: composed directly on the animated scene like Apple        */
+/* Weather — city, giant thin temperature, condition, H/L, all white   */
+/* (vibrancy tiers) with the scene scrim handling contrast. The        */
+/* moon/sun glyph is large (~200px) with a soft glow. Quick stats are  */
+/* a row of small flat Surface chips.                                  */
+/* ================================================================== */
 
 interface CurrentWeatherProps {
   city: City;
@@ -31,7 +32,8 @@ interface CurrentWeatherProps {
   refreshing: boolean;
 }
 
-function HeroChip({
+/** Small flat Surface chip for quick stats (content layer, no lensing). */
+function StatChip({
   icon,
   label,
   value,
@@ -41,16 +43,14 @@ function HeroChip({
   value: string;
 }) {
   return (
-    <div className="glass-subtle flex items-center gap-2.5 rounded-2xl px-3.5 py-2.5">
-      <span className="text-surface-muted" aria-hidden="true">
-        {icon}
-      </span>
-      <span className="flex min-w-0 flex-col">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-faint">
-          {label}
+    <div className="surface rounded-full px-3.5 py-2">
+      <p className="flex items-center gap-2 text-[13px] leading-none text-surface">
+        <span className="text-surface-muted" aria-hidden="true">
+          {icon}
         </span>
-        <span className="tnum truncate text-sm font-semibold text-surface">{value}</span>
-      </span>
+        <span className="font-medium">{value}</span>
+        <span className="text-[12px] text-surface-muted">{label}</span>
+      </p>
     </div>
   );
 }
@@ -88,119 +88,126 @@ export function CurrentWeather({
     }
   })();
 
+  const tempValue = displayTemp(current.temperature, units);
+
   return (
     <section
       aria-label={`Current weather in ${city.name}`}
-      className="glass animate-fade-up rounded-[var(--radius-hero)] p-5 shadow-[var(--shadow-glass)] sm:p-8"
+      className="animate-fade-up relative px-1 pt-2 sm:px-2"
     >
-      {/* Header row */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      {/* Header row — city + local time left, floating controls right */}
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="flex items-center gap-2 font-display text-2xl font-bold tracking-tight text-surface sm:text-3xl">
-            <MapPin className="h-5 w-5 shrink-0 text-surface-muted" aria-hidden="true" />
+          <h1 className="text-on-scene flex items-center gap-2 text-[28px] font-semibold leading-tight tracking-[-0.02em] sm:text-[34px]">
             <span className="truncate">{city.name}</span>
-            <span aria-hidden="true">{countryFlag(city.countryCode)}</span>
+            <span aria-hidden="true" className="text-[0.8em] opacity-90">
+              {countryFlag(city.countryCode)}
+            </span>
           </h1>
-          <p className="mt-1 truncate text-sm text-surface-muted">
+          <p className="text-on-scene-2 mt-1 truncate text-[15px]">
             {[city.admin1, city.country].filter(Boolean).join(' · ')}
           </p>
-          <p className="tnum mt-0.5 text-xs text-surface-faint">
-            {formatLocalDate(utcOffsetSeconds)} · {clock} local time
+          <p className="text-on-scene-3 tnum mt-0.5 text-[13px]">
+            {formatLocalDate(utcOffsetSeconds)} · {clock} local
           </p>
         </div>
 
         <div className="flex items-center gap-2">
           <ShareCardButton city={city} data={data} units={units} />
-          <button
+          <LiquidGlass
+            as="button"
             type="button"
             onClick={onToggleSave}
             aria-pressed={isSaved}
             aria-label={isSaved ? `Remove ${city.name} from saved cities` : `Save ${city.name} to saved cities`}
             title={isSaved ? 'Remove from saved' : 'Save city'}
-            className="glass-subtle focus-ring flex h-10 w-10 items-center justify-center rounded-full text-surface transition-all duration-250 hover:bg-[var(--surface-strong)]"
+            className="focus-ring flex h-11 w-11 items-center justify-center rounded-full"
           >
             {isSaved ? (
-              <BookmarkCheck className="h-5 w-5 text-aurora-400" aria-hidden="true" />
+              <BookmarkCheck className="h-5 w-5" aria-hidden="true" />
             ) : (
               <Bookmark className="h-5 w-5" aria-hidden="true" />
             )}
-          </button>
-          <button
+          </LiquidGlass>
+          <LiquidGlass
+            as="button"
             type="button"
             onClick={onRefresh}
             disabled={refreshing}
             aria-label="Refresh weather data"
             title="Refresh"
-            className="glass-subtle focus-ring flex h-10 w-10 items-center justify-center rounded-full text-surface transition-all duration-250 hover:bg-[var(--surface-strong)] disabled:opacity-60"
+            className="focus-ring flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-60"
           >
             <RefreshCw
               className={cn('h-5 w-5', refreshing && 'animate-spin')}
               aria-hidden="true"
             />
-          </button>
+          </LiquidGlass>
         </div>
       </div>
 
-      {/* Hero temperature */}
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-4 sm:mt-8">
-        <div className="animate-fade-in">
+      {/* Giant temperature + glowing glyph — directly on the scene */}
+      <div className="mt-4 flex items-end justify-between gap-2 sm:mt-6">
+        <div className="animate-fade-in min-w-0">
           <p
-            className="font-display text-[92px] font-semibold leading-none tracking-tight text-surface tnum sm:text-[128px]"
-            aria-label={`${displayTemp(current.temperature, units)} degrees`}
+            aria-label={`${tempValue} degrees ${label}`}
+            className="text-on-scene tnum flex items-start leading-[0.95] tracking-[-0.045em]"
+            style={{ fontSize: 'clamp(104px, 24vw, 176px)', fontWeight: 200 }}
           >
-            {formatTemp(current.temperature, units)}
+            {tempValue}
+            <span
+              aria-hidden="true"
+              className="mt-[0.09em] ml-[0.02em]"
+              style={{ fontSize: '0.52em', fontWeight: 300 }}
+            >
+              °
+            </span>
           </p>
-          <p className="mt-3 text-lg font-medium text-surface">{label}</p>
-          <p className="tnum text-sm text-surface-muted">
-            Feels like {formatTemp(current.apparentTemperature, units)}
-            {units === 'metric' ? 'C' : 'F'}
+          <p className="text-on-scene mt-3 text-[19px] font-medium sm:text-[21px]">{label}</p>
+          <p className="text-on-scene-2 mt-1 text-[15px]">
+            {today ? (
+              <span className="tnum">
+                H {formatTemp(today.tempMax, units)} · L {formatTemp(today.tempMin, units)}
+              </span>
+            ) : null}
+            <span className="tnum">
+              {today ? '  ·  ' : ''}Feels like {formatTemp(current.apparentTemperature, units)}
+            </span>
           </p>
         </div>
 
-        <div className="animate-scale-in mx-auto sm:mx-0">
+        <div className="animate-scale-in hidden shrink-0 pb-2 sm:block">
           <WeatherIcon
             condition={current.condition}
             isDay={current.isDay}
-            size={140}
-            className="h-28 w-28 sm:h-36 sm:w-36"
+            size={200}
+            className="h-44 w-44 drop-shadow-[0_10px_44px_rgb(255_255_255/0.28)] lg:h-[200px] lg:w-[200px]"
           />
         </div>
       </div>
 
-      {/* Quick chips */}
-      <div className="mt-6 grid grid-cols-2 gap-2.5 sm:mt-8 sm:grid-cols-4 sm:gap-3">
-        {today && (
-          <HeroChip
-            icon={
-              <span className="flex gap-0.5">
-                <ArrowUp className="h-4 w-4" />
-                <ArrowDown className="h-4 w-4" />
-              </span>
-            }
-            label="High · Low"
-            value={`${formatTemp(today.tempMax, units)} / ${formatTemp(today.tempMin, units)}`}
-          />
-        )}
-        <HeroChip
+      {/* Quick stats — row of small Surface chips */}
+      <div className="mt-6 flex flex-wrap items-center gap-2 sm:mt-7 sm:gap-2.5">
+        <StatChip
           icon={<Droplets className="h-4 w-4" />}
-          label="Precip chance"
+          label="rain"
           value={`${precipChance}%`}
         />
-        <HeroChip
+        <StatChip
           icon={<Wind className="h-4 w-4" />}
-          label="Wind"
-          value={`${formatWind(current.windSpeed, units)} ${compassPoint(current.windDirection)}`}
+          label={compassPoint(current.windDirection)}
+          value={formatWind(current.windSpeed, units)}
         />
         {today && (
-          <HeroChip
+          <StatChip
             icon={<Sunrise className="h-4 w-4" />}
-            label="Sunrise · Sunset"
-            value={`${formatHour(today.sunrise, units)} → ${formatHour(today.sunset, units)}`}
+            label={`→ ${formatHour(today.sunset, units)}`}
+            value={formatHour(today.sunrise, units)}
           />
         )}
       </div>
 
-      <p className="tnum mt-4 text-[11px] text-surface-faint">
+      <p className="text-on-scene-3 tnum mt-5 text-[12px]">
         Updated {updatedAt} · data by Open-Meteo
       </p>
     </section>

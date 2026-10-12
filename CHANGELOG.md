@@ -5,13 +5,111 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] — 2026-10-12
+
+The frosted-glassmorphism overhaul: the entire material system is replaced
+with a faithful implementation of Apple's iOS 27 Liquid Glass (WWDC26
+refinement of iOS 26) — real lensing, sharp rim light, clear glass over
+dark scenes.
+
+### Added
+- **`<LiquidGlass>` control layer** (`components/glass/LiquidGlass.tsx` +
+  `lib/liquid.ts`): Chromium-only true refraction via a runtime-generated
+  displacement map (rounded-rect SDF on a canvas, squircle profile ≈ Snell's
+  law, IOR ~1.5, zero center displacement) fed through **three per-RGB-channel
+  `feDisplacementMap` passes** (scales 1.00/1.05/1.10) recombined with
+  `feBlend screen` — a faint chromatic fringe at the rim. Filter region
+  −20 %/+140 %, cached by (w, h, radius), regenerated on resize, and
+  **budgeted to ≤ 3 live filters** with graceful blur fallback. Detection is
+  UA-based (`navigator.userAgentData.brands`) — never `CSS.supports()`,
+  which Safari lies about.
+- **Rim light + specular + gel press**: 1px opposing-corner rim (bright
+  top-left *and* bottom-right), inset top highlight, inner hairline, inner
+  glow, pointer-following specular (rAF, hover-capable pointers only), and a
+  press interaction (scale .96 + brighten) that springs back with overshoot.
+  Shadows intensify while content scrolls beneath (`.lg-boosted`).
+- **`<SegmentedControl>`**: LiquidGlass capsule whose selected segment is an
+  inner lighter glass capsule morphing between positions (framer-motion
+  `layoutId` + brief mid-travel `scaleX` stretch). Now used for the unit
+  toggle, AI card view, Ask-AI mode, and the model-compare metric.
+- **Liquid Glass transparency slider** (Settings): Ultra Clear → Fully
+  Tinted, driving tint alpha (.04 → .55), blur (2px → 28px), refraction
+  strength (1.0 → 0.25), rim brightness (1.0 → 0.35) and the Surface card
+  tint. Honors `prefers-reduced-transparency` (forces fully tinted),
+  `prefers-contrast: more`, `prefers-reduced-motion`; persisted in
+  `aether-preferences` v3.
+- **Reduce bright effects** toggle: disables the pointer specular and the
+  chromatic rim fringe.
+- **Scene scenery**: every scene now paints large soft light blobs, a
+  diagonal gradient band and small high-contrast orbs near the top/bottom
+  edges (calm middle for text) — the lensing finally has living light to
+  bend. Seeded-random, SSR-stable, reduced-motion aware.
+- **Compare cities dialog**: side-by-side live conditions for saved cities
+  (≥2) with a deterministic comfort score (feels-like distance, 12 h rain,
+  wind, humidity), Warmest/A–Z sorts, a "Best now" badge, and instant loads
+  via the shared per-city query cache (`useWeatherMany`). Opens from the
+  sidebar and ⌘K.
+- `reorderCities` store action (permutation-validated) and a `compare` UI
+  glyph.
+
+### Changed
+- **The hero has no panel**: city, giant thin temperature
+  (`clamp(104px, 24vw, 176px)` weight 200, −0.045em tracking, white +
+  text-shadow), condition, H/L, a ~200px glowing weather glyph and a row of
+  Surface stat chips compose directly on the animated scene (Apple Weather
+  layout). A scene-aware scrim (stronger over light skies) keeps the white
+  text at AA.
+- **Top bar is no longer a solid bar**: logo left, city + time as plain
+  white scene text center, and ONE grouped LiquidGlass capsule right
+  (44px/20px targets, full-opacity white icons) that strengthens while
+  content scrolls under it.
+- **Mobile dock** is a floating LiquidGlass capsule — `bottom:
+  max(12px, env(safe-area-inset-bottom))`, 64px tall, 11px sentence-case
+  labels, morphing selection capsule; the old fixed gradient bar and the
+  dock-overlap clipping bug are gone (drawer content padding-bottom ≥ dock
+  + 24, verified 58px clear at full scroll).
+- **Bottom sheet** is a flat Surface with 28px concentric top radii and a
+  small LiquidGlass grabber pill.
+- **All cards are flat Surface material** (`<Glass>` → `blur(22px)
+  saturate(1.4)`, light tint, hairline, soft shadow — no specular, no
+  refraction); `.glass*` utility aliases remapped to the same recipes;
+  `.glass-subtle` chips are now plain fills (no backdrop-filter on
+  scrolling rows). `--radius-card` 20px → 28px.
+- **Map chrome** (top bar, layers panel, time scrubber) uses the `clear`
+  LiquidGlass variant with a dimming scrim — the one place Clear is allowed.
+- **Typography**: card/section labels are sentence-case 13px
+  (`.card-label` / `.card-label-muted`) — the tracked-out 10px micro-caps
+  are gone everywhere (swept 29 instances); vibrancy tiers for text on
+  scene/glass (white 1.0/.72/.5) via `.text-on-scene*`.
+- Contrast floor raised: `--surface-muted` .66 → .74 (dark) / .64 → .72
+  (light), `--surface-faint` .42 → .56/.54; Marine card restructured (no
+  cramped wrapping); Advisor reasons show 3 lines; Aurora axis labels
+  bumped to the muted tier.
+
+### Fixed
+- `Logo.tsx` failed `tsc` under React 19 (`JSX.Element` namespace removed)
+  — switched to `ReactElement`.
+- Hydration attribute mismatch introduced by an extra wrapper `div`
+  (shifted `useId` paths for every LogoMark gradient) — the Liquid Glass
+  CSS variables now live directly on the app root element instead.
+- Dev-server fragility under browser + Turbopack memory pressure
+  (OOM-killed twice this round) — documented the double-fork daemon
+  relaunch pattern that survives the sandbox process reaper.
+
+### Performance
+- Audited to exactly **6 live backdrop-filter controls** on screen (top
+  capsule, 3 hero buttons, 2 segmented controls — hidden drawer duplicates
+  don't paint), ≤ 3 refraction filters, content-visibility on card
+  sections, rAF-throttled pointer tracking.
+
 ## [Unreleased]
 
 ### Planned
-- Weather radar / precipitation map layer
-- More saved-city management (reorder, rename)
+- Weather radar / precipitation nowcast layer on the map
+- Saved-city drag reordering (store action already shipped in 3.1.0)
 - Additional languages / localization
 - Pluggable AI providers (bring your own key / endpoint)
+- WebKit refraction recipe if Apple ever ships `backdrop-filter: url()`
 
 ## [3.0.0] — 2026-10-12
 

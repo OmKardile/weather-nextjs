@@ -28,7 +28,7 @@ export function MapLegend({ legend, loading }: MapLegendProps) {
       aria-label={`${legend.label} legend`}
       className="absolute bottom-3 left-3 z-20 max-w-[calc(100vw-1.5rem)] rounded-2xl px-3.5 py-2.5 lg:bottom-4 lg:left-4"
     >
-      <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-surface">
+      <p className="flex items-center gap-2 card-label">
         {legend.label}
         {loading && (
           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-aurora-400" aria-hidden="true" />

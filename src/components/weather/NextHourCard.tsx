@@ -120,7 +120,7 @@ export function NextHourCard({ minutely, units }: NextHourCardProps) {
           <p className="text-sm font-semibold text-surface">{headline}</p>
           <p className="tnum mt-0.5 truncate text-[11px] text-surface-faint">{caption}</p>
         </div>
-        <span className="ml-auto hidden text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-faint sm:block">
+        <span className="ml-auto hidden card-label-muted sm:block">
           Nowcast
         </span>
       </div>

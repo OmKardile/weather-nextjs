@@ -249,7 +249,7 @@ export function AuroraCard({ city, bundle, units }: AuroraCardProps): JSX.Elemen
       {active && motionOk ? <style>{shimmerCss}</style> : null}
       {active && motionOk ? <div className={shimmerClass} aria-hidden="true" /> : null}
 
-      <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+      <p className="flex items-center gap-1.5 card-label">
         <Icon name="satellite" size={14} strokeWidth={2} aria-hidden="true" />
         Aurora activity
       </p>

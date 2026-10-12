@@ -57,6 +57,10 @@ export function WeatherScene({ scene }: { scene: SceneConfig }) {
 
   return (
     <div aria-hidden="true" className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+      {/* Scene-aware legibility scrims — darken the sky (never the
+          content) so white hero text and the floating dock pass AA. */}
+      <div className="hero-scrim" />
+      <div className="dock-scrim" />
       {slots.map((slot) => {
         const { layers, gradient } = slot.scene;
         const precipitation = layers.rain !== 'none' || layers.snow;

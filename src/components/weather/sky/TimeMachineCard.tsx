@@ -387,7 +387,7 @@ export function TimeMachineCard({ city, bundle, units }: TimeMachineCardProps): 
     <div className="glass animate-fade-up rounded-[var(--radius-card)] p-4 shadow-[var(--shadow-glass)] sm:p-5">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-surface-muted">
+          <p className="flex items-center gap-1.5 card-label">
             <Icon name="sunset" size={14} strokeWidth={2} aria-hidden="true" />
             Time machine
           </p>
