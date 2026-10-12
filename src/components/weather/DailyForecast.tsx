@@ -86,7 +86,10 @@ export function DailyForecast({ days, units, currentTempC }: DailyForecastProps)
           return (
             <li
               key={day.date}
-              className="grid grid-cols-[54px_30px_1fr_76px] items-center gap-2 rounded-xl px-2 py-2.5 transition-colors hover:bg-[var(--surface-subtle)] sm:grid-cols-[62px_32px_9rem_1fr_3rem_5.5rem] sm:gap-2.5 sm:px-3"
+              className={cn(
+                'grid grid-cols-[54px_30px_1fr_76px] items-center gap-2 rounded-xl px-2 py-2.5 transition-colors hover:bg-[var(--surface-subtle)] sm:grid-cols-[62px_32px_9rem_1fr_3rem_5.5rem] sm:gap-2.5 sm:px-3',
+                isToday && 'bg-aurora-500/10 hover:bg-aurora-500/14',
+              )}
             >
               <span className="flex flex-col">
                 <span

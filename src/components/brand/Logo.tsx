@@ -1,4 +1,4 @@
-import { useId, type ReactElement } from 'react';
+import type { ReactElement } from 'react';
 import { cn } from '@/lib/utils';
 
 interface LogoMarkProps {
@@ -38,10 +38,17 @@ export const LOGO_MARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
   <path d="M20.5 40.5 q3.2 -3.4 6.4 0 t6.4 0 t6.4 0 t6.4 0" fill="none" stroke="#F4FFFB" stroke-width="4" stroke-linecap="round" opacity="0.92"/>
 </svg>`;
 
+/* Fixed, shared gradient ids. Every LogoMark renders byte-identical defs,
+   so all instances on a page can safely reference the same ids (browsers
+   resolve url(#id) to the first match — identical everywhere). This keeps
+   each mark self-contained for canvas serialization (share card) while
+   avoiding React 19's useId, whose streamed-Suspense path ids are not
+   stable between SSR and hydration (attribute mismatch warnings). */
+const MARK_BG = 'aether-mark-bg';
+const MARK_GLOW = 'aether-mark-glow';
+const MARK_SUN = 'aether-mark-sun';
+
 export function LogoMark({ className }: LogoMarkProps): ReactElement {
-  // Namespaced gradient ids — the mark can appear twice on a page (menu bar +
-  // footer) without duplicate DOM ids.
-  const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
   return (
     <svg
       viewBox="0 0 64 64"
@@ -50,26 +57,26 @@ export function LogoMark({ className }: LogoMarkProps): ReactElement {
       className={cn('h-9 w-9', className)}
     >
       <defs>
-        <linearGradient id={`aether-bg-${uid}`} x1="0" y1="0" x2="1" y2="1">
+        <linearGradient id={MARK_BG} x1="0" y1="0" x2="1" y2="1">
           <stop offset="0" stopColor="#53E6C4" />
           <stop offset="0.52" stopColor="#1FA98C" />
           <stop offset="1" stopColor="#0A4A40" />
         </linearGradient>
-        <radialGradient id={`aether-glow-${uid}`} cx="0.3" cy="0.22" r="0.75">
+        <radialGradient id={MARK_GLOW} cx="0.3" cy="0.22" r="0.75">
           <stop offset="0" stopColor="#EAFFF8" stopOpacity="0.34" />
           <stop offset="0.55" stopColor="#EAFFF8" stopOpacity="0" />
         </radialGradient>
-        <linearGradient id={`aether-sun-${uid}`} x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={MARK_SUN} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#FFE9A3" />
           <stop offset="1" stopColor="#F6A93B" />
         </linearGradient>
       </defs>
-      <rect width="64" height="64" rx="16" fill={`url(#aether-bg-${uid})`} />
-      <rect width="64" height="64" rx="16" fill={`url(#aether-glow-${uid})`} />
+      <rect width="64" height="64" rx="16" fill={`url(#${MARK_BG})`} />
+      <rect width="64" height="64" rx="16" fill={`url(#${MARK_GLOW})`} />
       {/* Sun rising in the counter of the A — halo first, then the disc,
           both behind the strokes so the peak "eclipses" them. */}
       <circle cx="32" cy="30.5" r="9.4" fill="#FFD66B" opacity="0.22" />
-      <circle cx="32" cy="30.5" r="5.6" fill={`url(#aether-sun-${uid})`} />
+      <circle cx="32" cy="30.5" r="5.6" fill={`url(#${MARK_SUN})`} />
       {/* The A: two round-capped diagonals meeting at the apex… */}
       <path
         d="M17.5 51 L32 13.5 L46.5 51"

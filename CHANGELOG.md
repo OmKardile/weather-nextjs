@@ -102,11 +102,48 @@ dark scenes.
   don't paint), ≤ 3 refraction filters, content-visibility on card
   sections, rAF-throttled pointer tracking.
 
+## [3.1.1] — 2026-10-12
+
+QA-driven round: two real hydration bugs fixed, saved-city drag
+reordering shipped, selected-state polish.
+
+### Added
+- **Saved-city drag reordering** — the completion of v3.1.0's
+  `reorderCities` store action. A shared `<CityReorderList>`
+  (dnd-kit, same sensor recipe as the forecast cards: 5px pointer
+  activation + keyboard sorting on the focusable grip) is used by both
+  the desktop sidebar and the mobile Cities tab: a grip toggle in the
+  header enters reorder mode (rows swap to drag handles with live
+  weather, a "Current" badge, drag elevation with shadow), **Done** or
+  Escape exits, and the new order persists instantly. Verified with
+  real mouse-drag reordering on both surfaces + localStorage checks.
+
+### Fixed
+- **Hydration attribute mismatch (LogoMark)** — React 19's useId paths
+  are unstable across streamed-Suspense SSR (server `R2j…` vs client
+  `Rkq…` ids), producing console errors whenever a city was persisted.
+  LogoMark now uses fixed shared gradient ids — every instance renders
+  byte-identical defs, so sharing is safe (and canvas serialization
+  stays self-contained). Warning initially moved to the sun glyph…
+- **…and the same fix for `<Icon>`** — icon gradient/clip ids are now
+  derived from the glyph name (`aic-sun-…`) instead of useId. Same
+  reasoning: identical defs per glyph, and day/night variants are
+  distinct glyph names. Three consecutive reloads now hydrate with a
+  completely clean console (previously ~2 errors per load, flaky).
+
+### Changed
+- **Hourly "Now" chip**: aurora-tinted selected treatment (border +
+  soft glow + inset highlight) and a bolder temperature, so the current
+  hour reads as the anchor of the strip.
+- **Daily "Today" row**: subtle aurora background highlight — the focal
+  row of the 7-day list.
+- **Sidebar active city row**: inner aurora ring (echoes the
+  `lg-selected` capsule language).
+
 ## [Unreleased]
 
 ### Planned
 - Weather radar / precipitation nowcast layer on the map
-- Saved-city drag reordering (store action already shipped in 3.1.0)
 - Additional languages / localization
 - Pluggable AI providers (bring your own key / endpoint)
 - WebKit refraction recipe if Apple ever ships `backdrop-filter: url()`

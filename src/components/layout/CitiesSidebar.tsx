@@ -1,7 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Glass } from '@/components/glass/Glass';
 import { Icon } from '@/components/icons/Icon';
+import { CityReorderList } from '@/components/layout/CityReorderList';
 import { WeatherIcon } from '@/components/weather/WeatherIcon';
 import { useWeather } from '@/hooks/use-weather';
 import { countryFlag, formatTemp } from '@/lib/units';
@@ -81,7 +83,7 @@ function CityRow({
         className={cn(
           'focus-ring glass-hover flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left',
           active
-            ? 'border-aurora-500/40 bg-aurora-500/12'
+            ? 'border-aurora-500/40 bg-aurora-500/12 shadow-[inset_0_0_0_1px_rgb(69_209_179/0.22)]'
             : 'glass-subtle border-transparent',
         )}
       >
@@ -140,6 +142,19 @@ export function CitiesSidebar({
   onCompare,
   className,
 }: CitiesSidebarProps) {
+  // Reorder mode: swaps the clickable rows for a drag-sortable list.
+  const [reordering, setReordering] = useState(false);
+
+  // Escape leaves reorder mode (matches the edit-mode convention).
+  useEffect(() => {
+    if (!reordering) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setReordering(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [reordering]);
+
   return (
     <Glass
       level="base"
@@ -152,6 +167,18 @@ export function CitiesSidebar({
           Cities
         </h2>
         <div className="flex items-center gap-1">
+          {cities.length >= 2 && !reordering && (
+            <button
+              type="button"
+              onClick={() => setReordering(true)}
+              aria-label="Reorder saved cities"
+              aria-pressed={reordering}
+              title="Reorder cities"
+              className="surface-subtle focus-ring flex h-7 w-7 items-center justify-center rounded-full text-surface-muted transition-colors hover:text-surface"
+            >
+              <Icon name="grip" size={14} />
+            </button>
+          )}
           {cities.length >= 2 && (
             <button
               type="button"
@@ -163,15 +190,17 @@ export function CitiesSidebar({
               <Icon name="compare" size={14} />
             </button>
           )}
-          <button
-            type="button"
-            onClick={onAddCity}
-            aria-label="Add a city"
-            title="Add a city (⌘K)"
-            className="glass-subtle focus-ring flex h-7 w-7 items-center justify-center rounded-full text-surface-muted transition-colors hover:text-surface"
-          >
-            <Icon name="plus" size={14} />
-          </button>
+          {!reordering && (
+            <button
+              type="button"
+              onClick={onAddCity}
+              aria-label="Add a city"
+              title="Add a city (⌘K)"
+              className="glass-subtle focus-ring flex h-7 w-7 items-center justify-center rounded-full text-surface-muted transition-colors hover:text-surface"
+            >
+              <Icon name="plus" size={14} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -188,6 +217,13 @@ export function CitiesSidebar({
               to search the world.
             </p>
           </div>
+        ) : reordering ? (
+          <CityReorderList
+            cities={cities}
+            units={units}
+            activeCity={activeCity}
+            onDone={() => setReordering(false)}
+          />
         ) : (
           cities.map((city) => (
             <CityRow

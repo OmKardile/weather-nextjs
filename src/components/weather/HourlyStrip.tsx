@@ -29,8 +29,9 @@ export function HourlyStrip({ hours, units }: HourlyStripProps) {
             role="listitem"
             aria-label={`${formatHour(hour.time, units)}, ${formatTemp(hour.temperature, units)}, ${hour.precipitationProbability}% precipitation chance`}
             className={cn(
-              'glass-subtle flex w-[74px] shrink-0 snap-start flex-col items-center gap-1.5 rounded-2xl px-2 py-3 sm:w-[80px]',
-              isNow && 'border-[var(--surface-ring)] bg-[var(--surface-strong)]',
+              'glass-subtle flex w-[74px] shrink-0 snap-start flex-col items-center gap-1.5 rounded-2xl px-2 py-3 transition-shadow duration-300 sm:w-[80px]',
+              isNow &&
+                'border-aurora-500/45 bg-aurora-500/12 shadow-[0_0_20px_-6px_rgb(69_209_179/0.45),inset_0_1px_0_rgb(255_255_255/0.14)]',
             )}
           >
             <span
@@ -42,7 +43,7 @@ export function HourlyStrip({ hours, units }: HourlyStripProps) {
               {isNow ? 'Now' : formatHour(hour.time, units)}
             </span>
             <WeatherIcon condition={hour.condition} isDay={hour.isDay} size={30} />
-            <span className="tnum text-sm font-semibold text-surface">
+            <span className={cn('tnum text-sm font-semibold', isNow && 'text-[15px] font-bold')}>
               {formatTemp(hour.temperature, units)}
             </span>
             <span

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useId, useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import './icons.css';
@@ -919,10 +919,12 @@ const UI_GLYPHS: Record<UiIconName, (args: { id: string; sw: number }) => ReactN
 /* ------------------------------------------------------------------ */
 
 export function Icon({ name, size = 24, animated = true, className, strokeWidth = 2 }: IconProps) {
-  // useId → collision-free ids for gradients / masks / clipPaths
-  // (10+ icons share the hourly strip page).
-  const rawId = useId();
-  const id = `a${rawId.replace(/[^a-zA-Z0-9]/g, '')}`;
+  // Fixed per-glyph ids: every instance of the same glyph renders
+  // byte-identical defs, so sharing ids across instances is safe (browsers
+  // resolve url(#id) to the first match — identical everywhere). React
+  // 19's useId paths are unstable across streamed-Suspense SSR, which
+  // caused hydration attribute mismatches; name-derived ids are stable.
+  const id = `aic-${name}`;
   const rootRef = useRef<SVGSVGElement | null>(null);
   const isWeather = WEATHER_NAMES.has(name);
 

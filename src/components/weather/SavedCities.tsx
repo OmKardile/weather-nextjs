@@ -1,6 +1,9 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { Plus, Star, X } from 'lucide-react';
+import { CityReorderList } from '@/components/layout/CityReorderList';
+import { Icon } from '@/components/icons/Icon';
 import { useWeather } from '@/hooks/use-weather';
 import { countryFlag, formatTemp } from '@/lib/units';
 import type { City, Units } from '@/types/weather';
@@ -75,6 +78,19 @@ export function SavedCities({
   onSaveCurrent,
   canSaveCurrent,
 }: SavedCitiesProps) {
+  // Reorder mode: chips become a drag-sortable list (shared component
+  // with the desktop sidebar).
+  const [reordering, setReordering] = useState(false);
+
+  useEffect(() => {
+    if (!reordering) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setReordering(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [reordering]);
+
   return (
     <section aria-labelledby="saved-cities-heading">
       <div className="mb-2.5 flex items-center justify-between gap-2">
@@ -85,38 +101,64 @@ export function SavedCities({
           <Star className="h-3.5 w-3.5" aria-hidden="true" />
           Saved cities
         </h2>
-        <span className="text-[10px] text-surface-faint">{cities.length}/8</span>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {cities.map((city) => (
-          <SavedCityChip
-            key={city.id}
-            city={city}
-            active={activeCity?.id === city.id && activeCity?.latitude === city.latitude}
-            units={units}
-            onSelect={onSelect}
-            onRemove={onRemove}
-          />
-        ))}
-
-        {canSaveCurrent ? (
-          <button
-            type="button"
-            onClick={onSaveCurrent}
-            className="glass glass-hover focus-ring flex items-center gap-1.5 rounded-full py-2 pl-3 pr-3.5 text-sm font-medium text-surface"
-          >
-            <Plus className="h-3.5 w-3.5 text-aurora-400" aria-hidden="true" />
-            Save {activeCity?.name}
-          </button>
-        ) : null}
-
-        {cities.length === 0 && !canSaveCurrent && (
-          <p className="text-sm text-surface-muted">
-            No saved cities yet — tap the bookmark in the hero to pin one.
-          </p>
+        {cities.length >= 2 && !reordering ? (
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-surface-faint">{cities.length}/8</span>
+            <button
+              type="button"
+              onClick={() => setReordering(true)}
+              aria-label="Reorder saved cities"
+              title="Reorder cities"
+              className="surface-subtle focus-ring flex h-7 w-7 items-center justify-center rounded-full text-surface-muted transition-colors hover:text-surface"
+            >
+              <Icon name="grip" size={14} />
+            </button>
+          </div>
+        ) : (
+          <span className="text-[11px] text-surface-faint">
+            {reordering ? 'Drag to reorder' : `${cities.length}/8`}
+          </span>
         )}
       </div>
+
+      {reordering ? (
+        <CityReorderList
+          cities={cities}
+          units={units}
+          activeCity={activeCity}
+          onDone={() => setReordering(false)}
+        />
+      ) : (
+        <div className="flex flex-wrap items-center gap-2">
+          {cities.map((city) => (
+            <SavedCityChip
+              key={city.id}
+              city={city}
+              active={activeCity?.id === city.id && activeCity?.latitude === city.latitude}
+              units={units}
+              onSelect={onSelect}
+              onRemove={onRemove}
+            />
+          ))}
+
+          {canSaveCurrent ? (
+            <button
+              type="button"
+              onClick={onSaveCurrent}
+              className="glass glass-hover focus-ring flex items-center gap-1.5 rounded-full py-2 pl-3 pr-3.5 text-sm font-medium text-surface"
+            >
+              <Plus className="h-3.5 w-3.5 text-aurora-400" aria-hidden="true" />
+              Save {activeCity?.name}
+            </button>
+          ) : null}
+
+          {cities.length === 0 && !canSaveCurrent && (
+            <p className="text-sm text-surface-muted">
+              No saved cities yet — tap the bookmark in the hero to pin one.
+            </p>
+          )}
+        </div>
+      )}
     </section>
   );
 }
