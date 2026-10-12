@@ -3,6 +3,7 @@
 import { Leaf } from 'lucide-react';
 import { aqiBand, aqiPosition, aqiBands, aqiDominantPollutant } from '@/lib/aqi';
 import { ExpandableCard } from '@/components/weather/ExpandableCard';
+import { formatHour } from '@/lib/units';
 import type { AirQuality, Pollen, Units, WeatherBundle } from '@/types/weather';
 
 /* ================================================================== */
@@ -14,6 +15,125 @@ import type { AirQuality, Pollen, Units, WeatherBundle } from '@/types/weather';
 interface AirQualityCardProps {
   bundle: WeatherBundle;
   units: Units;
+}
+
+/* ------------------------------------------------------------------ */
+/* 24h AQI trend sparkline (European AQI hourly forecast).              */
+/* ------------------------------------------------------------------ */
+
+interface AqiTrendProps {
+  points: Array<{ time: string; value: number }>;
+  units: Units;
+  /** Rendered height of the plot area in px (width stretches to card). */
+  height?: number;
+  /** Show the peak value bubble + hour tick labels (detail view). */
+  detailed?: boolean;
+}
+
+function AqiTrend({ points, units, height = 44, detailed = false }: AqiTrendProps) {
+  if (points.length < 2) return null;
+
+  const width = 240;
+  const values = points.map((p) => p.value);
+  const max = Math.max(...values);
+  const min = Math.min(...values);
+  const peakIndex = values.indexOf(max);
+  const peak = points[peakIndex];
+  // Headroom above the max for the peak dot + label; baseline slightly below min.
+  const yMax = Math.max(max * 1.18, max + 6);
+  const yMin = Math.max(0, Math.min(min * 0.7, min - 4));
+  const span = Math.max(1, yMax - yMin);
+  const x = (i: number) => (i / (points.length - 1)) * width;
+  const y = (v: number) => height - ((v - yMin) / span) * height;
+
+  const line = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(p.value).toFixed(1)}`).join(' ');
+  const area = `${line} L ${width} ${height} L 0 ${height} Z`;
+
+  const peakBand = aqiBand(peak.value, 'european');
+  const firstBand = aqiBand(points[0].value, 'european');
+  const lastBand = aqiBand(points[points.length - 1].value, 'european');
+  const gradientId = 'aqi-trend-fill';
+
+  return (
+    <div className="mt-3">
+      <p className="flex items-baseline justify-between card-label">
+        Next 24h
+        <span className="tnum text-[9px] font-normal normal-case tracking-normal text-surface-faint">
+          peaks {formatHour(peak.time, units)} · {Math.round(peak.value)}
+        </span>
+      </p>
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
+        className="mt-1 block w-full"
+        style={{ height }}
+        role="img"
+        aria-label={`Air quality over the next 24 hours: now ${Math.round(points[0].value)} (${firstBand.label}), peaking ${Math.round(peak.value)} around ${formatHour(peak.time, units)}, ending ${Math.round(points[points.length - 1].value)} (${lastBand.label})`}
+      >
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={peakBand.color} stopOpacity="0.34" />
+            <stop offset="1" stopColor={peakBand.color} stopOpacity="0.02" />
+          </linearGradient>
+        </defs>
+        {/* faint midline at the current value for orientation */}
+        <line
+          x1="0"
+          x2={width}
+          y1={y(points[0].value).toFixed(1)}
+          y2={y(points[0].value).toFixed(1)}
+          stroke="currentColor"
+          strokeWidth="0.75"
+          strokeDasharray="3 4"
+          className="text-surface-faint"
+          opacity="0.5"
+        />
+        <path d={area} fill={`url(#${gradientId})`} />
+        <path
+          d={line}
+          fill="none"
+          stroke={peakBand.color}
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+        {/* peak marker */}
+        <circle
+          cx={x(peakIndex).toFixed(1)}
+          cy={y(peak.value).toFixed(1)}
+          r={detailed ? 3.4 : 2.6}
+          fill={peakBand.color}
+          stroke="white"
+          strokeWidth="1.4"
+          vectorEffect="non-scaling-stroke"
+        />
+        {/* "now" tick at the left edge */}
+        <circle
+          cx="0"
+          cy={y(points[0].value).toFixed(1)}
+          r="2.4"
+          fill="white"
+          opacity="0.85"
+          vectorEffect="non-scaling-stroke"
+        />
+        {detailed && (
+          <g className="tnum" fill="currentColor" fontSize="8.5" opacity="0.75">
+            <text x={x(peakIndex).toFixed(1)} y={Math.max(9, y(peak.value) - 6).toFixed(1)} textAnchor={peakIndex > points.length - 4 ? 'end' : peakIndex < 3 ? 'start' : 'middle'}>
+              {Math.round(peak.value)}
+            </text>
+          </g>
+        )}
+      </svg>
+      {detailed && (
+        <div className="tnum mt-0.5 flex justify-between text-[9px] text-surface-faint" aria-hidden="true">
+          <span>now {Math.round(points[0].value)}</span>
+          <span>{formatHour(points[Math.floor(points.length / 2)].time, units)}</span>
+          <span>{formatHour(points[points.length - 1].time, units)}</span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -208,6 +328,10 @@ export function AirQualityCard({ bundle, units }: AirQualityCardProps) {
         European AQI by CAMS.
       </p>
 
+      {air.trend && air.trend.length >= 2 && (
+        <AqiTrend points={air.trend} units={units} height={72} detailed />
+      )}
+
       {pollenDetail(pollen)}
     </div>
   );
@@ -254,6 +378,8 @@ export function AirQualityCard({ bundle, units }: AirQualityCardProps) {
         <span>EAQI</span>
         <span>100+</span>
       </div>
+
+      {air.trend && air.trend.length >= 2 && <AqiTrend points={air.trend} units={units} />}
 
       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-1.5">
         {pollutants.slice(0, 4).map((pollutant) => (

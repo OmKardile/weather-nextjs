@@ -225,11 +225,17 @@ export default function MapOverlay({ onClose, city, units, surface }: MapOverlay
     if (!container) return;
 
     const initial = cityRef.current;
+    // Defense-in-depth: a malformed City (legacy/hand-edited localStorage)
+    // must never reach MapLibre — `new LngLat(NaN, NaN)` throws and takes the
+    // whole app down. Fall back to the neutral world view instead.
+    const initialLng = Number.isFinite(initial?.longitude) ? initial!.longitude : 15;
+    const initialLat = Number.isFinite(initial?.latitude) ? initial!.latitude : 25;
+    const hasInitial = Number.isFinite(initial?.longitude) && Number.isFinite(initial?.latitude);
     const instance = new maplibregl.Map({
       container,
       style: buildBasemapStyle(),
-      center: initial ? [initial.longitude, initial.latitude] : [15, 25],
-      zoom: initial ? 5.2 : 1.9,
+      center: [initialLng, initialLat],
+      zoom: hasInitial ? 5.2 : 1.9,
       minZoom: 1,
       maxZoom: 17,
       dragRotate: false,
@@ -556,15 +562,18 @@ export default function MapOverlay({ onClose, city, units, surface }: MapOverlay
         pin.active ? `${pin.city.name} — current city` : pin.city.name,
       );
       el.addEventListener('click', () => {
+        if (!Number.isFinite(pin.city.longitude) || !Number.isFinite(pin.city.latitude)) return;
         instance.flyTo({
           center: [pin.city.longitude, pin.city.latitude],
           zoom: Math.max(instance.getZoom(), 7),
           duration: 900,
         });
       });
+      const pinLng = Number.isFinite(pin.city.longitude) ? pin.city.longitude : 15;
+      const pinLat = Number.isFinite(pin.city.latitude) ? pin.city.latitude : 25;
       markers.push(
         new maplibregl.Marker({ element: el })
-          .setLngLat([pin.city.longitude, pin.city.latitude])
+          .setLngLat([pinLng, pinLat])
           .addTo(instance),
       );
     }

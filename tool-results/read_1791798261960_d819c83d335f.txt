@@ -1,0 +1,798 @@
+     1→'use client';
+     2→
+     3→import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+     4→import { createPortal } from 'react-dom';
+     5→import * as maplibregl from 'maplibre-gl';
+     6→import { setWorkerUrl } from 'maplibre-gl';
+     7→import 'maplibre-gl/dist/maplibre-gl.css';
+     8→import type { GeoJSONSource, Map as MLMap, Marker as MLMarker } from 'maplibre-gl';
+     9→import type { FeatureCollection } from 'geojson';
+    10→import { LiquidGlass } from '@/components/glass/LiquidGlass';
+    11→import { Icon } from '@/components/icons/Icon';
+    12→import { usePreferences } from '@/hooks/use-preferences';
+    13→import type { City, GeoQuake, Units } from '@/types/weather';
+    14→import { HeatCanvas } from './HeatCanvas';
+    15→import { LayerPicker, type MapLayerKey } from './LayerPicker';
+    16→import { MapLegend, type LegendInfo } from './MapLegend';
+    17→import { PointPopup, QuakePopup } from './PopupContents';
+    18→import { TimeScrubber } from './TimeScrubber';
+    19→import { useGrid, type ViewBbox } from './use-grid';
+    20→import { WindParticles } from './WindParticles';
+    21→import {
+    22→  BASEMAP_BG,
+    23→  GIBS_ATTRIBUTION,
+    24→  GIBS_MAX_ZOOM,
+    25→  PRECIP_RAMP,
+    26→  RADAR_RAMP,
+    27→  RAINVIEWER_ATTRIBUTION,
+    28→  RAINVIEWER_MAX_ZOOM,
+    29→  TEMP_RAMP,
+    30→  WIND_RAMP,
+    31→  buildBasemapStyle,
+    32→  gibsTileUrl,
+    33→  rainViewerTileUrl,
+    34→} from './map-styles';
+    35→import './map.css';
+    36→
+    37→/* maplibre v6 derives its web-worker URL from import.meta.url, which breaks
+    38→ * under bundlers (the derived path 404s → "Worker failed to load"). The worker
+    39→ * bundle is served from /public and pointed at explicitly instead. */
+    40→/* Verified by 18-2: without this override Turbopack's default worker URL
+    41→ * fails to load (console: "Worker failed to load") and tile decoding dies —
+    42→ * the public worker file IS required. Kept + eslint-ignored (see
+    43→ * eslint.config.mjs). File is byte-identical to maplibre-gl/dist/maplibre-gl-worker.mjs. */
+    44→setWorkerUrl('/maplibre-gl-worker.mjs?v=6.13.0');
+    45→
+    46→/* ================================================================== */
+    47→/* MapOverlay — full-screen Map mode.                                  */
+    48→/*                                                                     */
+    49→/* Dynamically imported (ssr: false) by AetherApp so maplibre never    */
+    50→/* loads unless the map is opened. Owns the MapLibre instance, all     */
+    51→/* raster/geojson layers, the canvas overlays and the glass chrome.    */
+    52→/* Esc closes; focus is trapped and restored; rAF + fetches are        */
+    53→/* cancelled on unmount.                                               */
+    54→/* ================================================================== */
+    55→
+    56→export interface MapOverlayProps {
+    57→  onClose: () => void;
+    58→  city: City | null;
+    59→  units: Units;
+    60→  surface: 'dark' | 'light';
+    61→}
+    62→
+    63→const HOUR_STEPS = 48;
+    64→
+    65→type LayerState = Record<MapLayerKey, boolean>;
+    66→
+    67→type ActivePopup =
+    68→  | { kind: 'point'; lng: number; lat: number }
+    69→  | { kind: 'quake'; quake: GeoQuake };
+    70→
+    71→interface RainViewerApi {
+    72→  host?: string;
+    73→  radar?: { past?: Array<{ time: number; path: string }> };
+    74→}
+    75→
+    76→function normalizeQuake(p: Record<string, unknown>): GeoQuake {
+    77→  return {
+    78→    id: String(p.id ?? ''),
+    79→    magnitude: Number(p.magnitude ?? 0),
+    80→    place: String(p.place ?? ''),
+    81→    time: String(p.time ?? new Date().toISOString()),
+    82→    latitude: Number(p.latitude ?? 0),
+    83→    longitude: Number(p.longitude ?? 0),
+    84→    depthKm: Number(p.depthKm ?? 0),
+    85→    url: String(p.url ?? ''),
+    86→    tsunami: Boolean(p.tsunami),
+    87→  };
+    88→}
+    89→
+    90→function quakesToCollection(quakes: GeoQuake[]): FeatureCollection {
+    91→  return {
+    92→    type: 'FeatureCollection',
+    93→    features: quakes.map((q) => ({
+    94→      type: 'Feature' as const,
+    95→      geometry: { type: 'Point' as const, coordinates: [q.longitude, q.latitude] },
+    96→      properties: { ...q },
+    97→    })),
+    98→  };
+    99→}
+   100→
+   101→export default function MapOverlay({ onClose, city, units, surface }: MapOverlayProps) {
+   102→  // Saved cities come straight from the same store the sidebar uses (read-only).
+   103→  const savedCities = usePreferences((state) => state.savedCities);
+   104→
+   105→  const rootRef = useRef<HTMLDivElement>(null);
+   106→  const containerRef = useRef<HTMLDivElement>(null);
+   107→  const closeBtnRef = useRef<HTMLButtonElement>(null);
+   108→  const prevFocusRef = useRef<HTMLElement | null>(null);
+   109→  const mapRef = useRef<MLMap | null>(null);
+   110→  const dynamicLayersRef = useRef<Set<string>>(new Set());
+   111→  const dynamicSourcesRef = useRef<Set<string>>(new Set());
+   112→  const viewBboxRef = useRef<ViewBbox | null>(null);
+   113→  const layersRef = useRef<LayerState | null>(null);
+   114→  const radarHiddenRef = useRef(false);
+   115→  const cityRef = useRef(city);
+   116→  const popupRef = useRef<maplibregl.Popup | null>(null);
+   117→  const markerRef = useRef<MLMarker | null>(null);
+   118→  const popupDataRef = useRef<ActivePopup | null>(null);
+   119→
+   120→  const [map, setMap] = useState<MLMap | null>(null);
+   121→  const [mapReady, setMapReady] = useState(false);
+   122→  const [viewBbox, setViewBbox] = useState<ViewBbox | null>(null);
+   123→  const [pickerOpen, setPickerOpen] = useState(false);
+   124→  const [basemap, setBasemap] = useState<'dark' | 'light'>(surface === 'light' ? 'light' : 'dark');
+   125→  const [basemapTouched, setBasemapTouched] = useState(false);
+   126→  const [layers, setLayers] = useState<LayerState>({
+   127→    wind: true,
+   128→    precip: false,
+   129→    temp: false,
+   130→    radar: false,
+   131→    satellite: false,
+   132→    quakes: false,
+   133→  });
+   134→  const [hour, setHour] = useState(0);
+   135→  const [hourPlaying, setHourPlaying] = useState(false);
+   136→  const [radarData, setRadarData] = useState<{
+   137→    host: string;
+   138→    frames: Array<{ time: number; path: string }>;
+   139→    fetchedAt: number;
+   140→  } | null>(null);
+   141→  const [radarError, setRadarError] = useState<string | null>(null);
+   142→  const [radarIndex, setRadarIndex] = useState(0);
+   143→  const [radarPlaying, setRadarPlaying] = useState(false);
+   144→  const [radarHiddenByZoom, setRadarHiddenByZoom] = useState(false);
+   145→  const [quakes, setQuakes] = useState<GeoQuake[] | null>(null);
+   146→  const [popupData, setPopupData] = useState<ActivePopup | null>(null);
+   147→  const [popupContainer, setPopupContainer] = useState<HTMLDivElement | null>(null);
+   148→
+   149→  cityRef.current = city;
+   150→  layersRef.current = layers;
+   151→
+   152→  /* ------------------------- focus management ------------------------ */
+   153→
+   154→  useEffect(() => {
+   155→    prevFocusRef.current =
+   156→      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+   157→    closeBtnRef.current?.focus();
+   158→    return () => {
+   159→      if (prevFocusRef.current?.isConnected) prevFocusRef.current.focus();
+   160→    };
+   161→  }, []);
+   162→
+   163→  /* --------------------------- popups -------------------------------- */
+   164→
+   165→  const closePopup = useCallback(() => {
+   166→    popupRef.current?.remove();
+   167→    popupRef.current = null;
+   168→    markerRef.current?.remove();
+   169→    markerRef.current = null;
+   170→    popupDataRef.current = null;
+   171→    setPopupData(null);
+   172→    setPopupContainer(null);
+   173→  }, []);
+   174→
+   175→  const attachPopup = useCallback(
+   176→    (data: ActivePopup, lng: number, lat: number, withMarker: boolean) => {
+   177→      const mapInstance = mapRef.current;
+   178→      if (!mapInstance) return;
+   179→      closePopup();
+   180→      const host = document.createElement('div');
+   181→      const popup = new maplibregl.Popup({
+   182→        closeButton: false,
+   183→        closeOnClick: false,
+   184→        className: 'aether-popup',
+   185→        offset: 18,
+   186→        maxWidth: '360px',
+   187→      })
+   188→        .setLngLat([lng, lat])
+   189→        .setDOMContent(host)
+   190→        .addTo(mapInstance);
+   191→      let marker: MLMarker | null = null;
+   192→      if (withMarker) {
+   193→        const el = document.createElement('span');
+   194→        el.className = 'aether-pin aether-pin--point';
+   195→        el.setAttribute('aria-hidden', 'true');
+   196→        marker = new maplibregl.Marker({ element: el }).setLngLat([lng, lat]).addTo(mapInstance);
+   197→      }
+   198→      popupRef.current = popup;
+   199→      markerRef.current = marker;
+   200→      popupDataRef.current = data;
+   201→      setPopupData(data);
+   202→      setPopupContainer(host);
+   203→    },
+   204→    [closePopup],
+   205→  );
+   206→
+   207→  const openPointPopup = useCallback(
+   208→    (lng: number, lat: number) => {
+   209→      attachPopup({ kind: 'point', lng, lat }, lng, lat, true);
+   210→    },
+   211→    [attachPopup],
+   212→  );
+   213→
+   214→  const openQuakePopup = useCallback(
+   215→    (quake: GeoQuake) => {
+   216→      attachPopup({ kind: 'quake', quake }, quake.longitude, quake.latitude, false);
+   217→    },
+   218→    [attachPopup],
+   219→  );
+   220→
+   221→  /* --------------------------- map init ------------------------------ */
+   222→
+   223→  useEffect(() => {
+   224→    const container = containerRef.current;
+   225→    if (!container) return;
+   226→
+   227→    const initial = cityRef.current;
+   228→    const instance = new maplibregl.Map({
+   229→      container,
+   230→      style: buildBasemapStyle(),
+   231→      center: initial ? [initial.longitude, initial.latitude] : [15, 25],
+   232→      zoom: initial ? 5.2 : 1.9,
+   233→      minZoom: 1,
+   234→      maxZoom: 17,
+   235→      dragRotate: false,
+   236→      touchPitch: false,
+   237→      attributionControl: { compact: true },
+   238→    });
+   239→    mapRef.current = instance;
+   240→    instance.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-left');
+   241→    // Radar/satellite tiles 404 at the edges — expected, stay quiet.
+   242→    instance.on('error', () => {});
+   243→
+   244→    const round1 = (v: number) => Math.round(v * 10) / 10;
+   245→    const syncBbox = () => {
+   246→      const b = instance.getBounds();
+   247→      const next: ViewBbox = {
+   248→        minLat: round1(b.getSouth()),
+   249→        minLon: round1(b.getWest()),
+   250→        maxLat: round1(b.getNorth()),
+   251→        maxLon: round1(b.getEast()),
+   252→      };
+   253→      const prev = viewBboxRef.current;
+   254→      if (
+   255→        !prev ||
+   256→        prev.minLat !== next.minLat ||
+   257→        prev.minLon !== next.minLon ||
+   258→        prev.maxLat !== next.maxLat ||
+   259→        prev.maxLon !== next.maxLon
+   260→      ) {
+   261→        viewBboxRef.current = next;
+   262→        setViewBbox(next);
+   263→      }
+   264→    };
+   265→
+   266→    let bboxDebounce = 0;
+   267→    const onMoveEnd = () => {
+   268→      window.clearTimeout(bboxDebounce);
+   269→      bboxDebounce = window.setTimeout(syncBbox, 350);
+   270→    };
+   271→    const onLoad = () => {
+   272→      setMapReady(true);
+   273→      setMap(instance);
+   274→      syncBbox();
+   275→    };
+   276→    instance.on('load', onLoad);
+   277→    instance.on('moveend', onMoveEnd);
+   278→
+   279→    // RainViewer free tier: radar hides above zoom 7.
+   280→    const onZoom = () => {
+   281→      const hide = instance.getZoom() > RAINVIEWER_MAX_ZOOM + 0.2;
+   282→      if (hide !== radarHiddenRef.current) {
+   283→        radarHiddenRef.current = hide;
+   284→        setRadarHiddenByZoom(hide);
+   285→      }
+   286→    };
+   287→    instance.on('zoom', onZoom);
+   288→
+   289→    const onClick = (e: maplibregl.MapMouseEvent) => {
+   290→      if (layersRef.current?.quakes && instance.getLayer('quakes-circles')) {
+   291→        const hits = instance.queryRenderedFeatures(e.point, { layers: ['quakes-circles'] });
+   292→        if (hits.length > 0 && hits[0].properties) {
+   293→          openQuakePopup(normalizeQuake(hits[0].properties as Record<string, unknown>));
+   294→          return;
+   295→        }
+   296→      }
+   297→      openPointPopup(e.lngLat.lng, e.lngLat.lat);
+   298→    };
+   299→    instance.on('click', onClick);
+   300→
+   301→    const onMouseMove = (e: maplibregl.MapMouseEvent) => {
+   302→      if (!layersRef.current?.quakes || !instance.getLayer('quakes-circles')) return;
+   303→      const hits = instance.queryRenderedFeatures(e.point, { layers: ['quakes-circles'] });
+   304→      instance.getCanvas().style.cursor = hits.length > 0 ? 'pointer' : '';
+   305→    };
+   306→    instance.on('mousemove', onMouseMove);
+   307→
+   308→    return () => {
+   309→      window.clearTimeout(bboxDebounce);
+   310→      popupRef.current?.remove();
+   311→      markerRef.current?.remove();
+   312→      popupRef.current = null;
+   313→      markerRef.current = null;
+   314→      // Explicit removal of every dynamic layer/source, then the map itself.
+   315→      for (const id of dynamicLayersRef.current) {
+   316→        if (instance.getLayer(id)) instance.removeLayer(id);
+   317→      }
+   318→      for (const id of dynamicSourcesRef.current) {
+   319→        if (instance.getSource(id)) instance.removeSource(id);
+   320→      }
+   321→      dynamicLayersRef.current.clear();
+   322→      dynamicSourcesRef.current.clear();
+   323→      instance.remove();
+   324→      mapRef.current = null;
+   325→    };
+   326→  }, []);
+   327→
+   328→  /* ---------------------- basemap + theme ---------------------------- */
+   329→
+   330→  useEffect(() => {
+   331→    if (basemapTouched) return;
+   332→    setBasemap(surface === 'light' ? 'light' : 'dark');
+   333→  }, [surface, basemapTouched]);
+   334→
+   335→  useEffect(() => {
+   336→    const instance = mapRef.current;
+   337→    if (!instance || !mapReady) return;
+   338→    const showDark = basemap === 'dark';
+   339→    instance.setLayoutProperty('basemap-dark', 'visibility', showDark ? 'visible' : 'none');
+   340→    instance.setLayoutProperty('basemap-dark-labels', 'visibility', showDark ? 'visible' : 'none');
+   341→    instance.setLayoutProperty('basemap-light', 'visibility', showDark ? 'none' : 'visible');
+   342→    instance.setLayoutProperty('basemap-light-labels', 'visibility', showDark ? 'none' : 'visible');
+   343→    instance.setPaintProperty('bg', 'background-color', BASEMAP_BG[basemap]);
+   344→  }, [mapReady, basemap]);
+   345→
+   346→  /* ------------------------- grid metrics ---------------------------- */
+   347→
+   348→  const windGrid = useGrid('wind', viewBbox, hour, layers.wind);
+   349→  const precipGrid = useGrid('precip', viewBbox, hour, layers.precip);
+   350→  const tempGrid = useGrid('temp', viewBbox, hour, layers.temp);
+   351→
+   352→  /* ------------------------ RainViewer radar ------------------------- */
+   353→
+   354→  useEffect(() => {
+   355→    if (!layers.radar) return;
+   356→    if (radarData && Date.now() - radarData.fetchedAt < 10 * 60 * 1000) return;
+   357→    const controller = new AbortController();
+   358→    fetch('https://api.rainviewer.com/public/weather-maps.json', {
+   359→      signal: controller.signal,
+   360→    })
+   361→      .then(async (res) => {
+   362→        if (!res.ok) throw new Error(`RainViewer failed (${res.status})`);
+   363→        return (await res.json()) as RainViewerApi;
+   364→      })
+   365→      .then((json) => {
+   366→        const frames = (json.radar?.past ?? []).slice(-12);
+   367→        setRadarData({
+   368→          host: json.host ?? 'https://tilecache.rainviewer.com',
+   369→          frames,
+   370→          fetchedAt: Date.now(),
+   371→        });
+   372→        setRadarError(null);
+   373→        setRadarIndex(frames.length - 1);
+   374→      })
+   375→      .catch((error: unknown) => {
+   376→        if (controller.signal.aborted) return;
+   377→        setRadarError(error instanceof Error ? error.message : 'Radar unavailable');
+   378→      });
+   379→    return () => controller.abort();
+   380→  }, [layers.radar, radarData]);
+   381→
+   382→  const radarTotal = radarData?.frames.length ?? 0;
+   383→
+   384→  useEffect(() => {
+   385→    const instance = mapRef.current;
+   386→    if (!instance || !mapReady) return;
+   387→    const frames = radarData?.frames ?? [];
+   388→    const active = layers.radar && frames.length > 0;
+   389→    if (active) {
+   390→      const idx = Math.min(Math.max(0, radarIndex), frames.length - 1);
+   391→      const frame = frames[idx];
+   392→      const id = `rv-${frame.time}`;
+   393→      if (!instance.getSource(id)) {
+   394→        instance.addSource(id, {
+   395→          type: 'raster',
+   396→          tiles: [rainViewerTileUrl(radarData!.host, frame.path)],
+   397→          tileSize: 256,
+   398→          maxzoom: RAINVIEWER_MAX_ZOOM,
+   399→          attribution: RAINVIEWER_ATTRIBUTION,
+   400→        });
+   401→        dynamicSourcesRef.current.add(id);
+   402→        const beforeId = instance.getLayer('quakes-circles') ? 'quakes-circles' : 'overlay-anchor';
+   403→        instance.addLayer(
+   404→          {
+   405→            id,
+   406→            type: 'raster',
+   407→            source: id,
+   408→            paint: { 'raster-opacity': 0.8, 'raster-fade-duration': 200 },
+   409→          },
+   410→          beforeId,
+   411→        );
+   412→        dynamicLayersRef.current.add(id);
+   413→      }
+   414→      for (const frameItem of frames) {
+   415→        const fid = `rv-${frameItem.time}`;
+   416→        if (!instance.getLayer(fid)) continue;
+   417→        instance.setLayoutProperty(
+   418→          fid,
+   419→          'visibility',
+   420→          frameItem === frame && !radarHiddenByZoom ? 'visible' : 'none',
+   421→        );
+   422→      }
+   423→    } else {
+   424→      for (const frameItem of frames) {
+   425→        const fid = `rv-${frameItem.time}`;
+   426→        if (instance.getLayer(fid)) instance.setLayoutProperty(fid, 'visibility', 'none');
+   427→      }
+   428→    }
+   429→  }, [mapReady, layers.radar, radarData, radarIndex, radarHiddenByZoom]);
+   430→
+   431→  /* -------------------------- GIBS satellite ------------------------- */
+   432→
+   433→  useEffect(() => {
+   434→    const instance = mapRef.current;
+   435→    if (!instance || !mapReady) return;
+   436→    if (layers.satellite && !instance.getSource('gibs-satellite')) {
+   437→      instance.addSource('gibs-satellite', {
+   438→        type: 'raster',
+   439→        tiles: [gibsTileUrl()],
+   440→        tileSize: 256,
+   441→        maxzoom: GIBS_MAX_ZOOM,
+   442→        attribution: GIBS_ATTRIBUTION,
+   443→      });
+   444→      dynamicSourcesRef.current.add('gibs-satellite');
+   445→      const radarLayer = radarData?.frames
+   446→        .map((f) => `rv-${f.time}`)
+   447→        .find((id) => instance.getLayer(id));
+   448→      const beforeId =
+   449→        radarLayer ?? (instance.getLayer('quakes-circles') ? 'quakes-circles' : 'overlay-anchor');
+   450→      instance.addLayer(
+   451→        {
+   452→          id: 'gibs-layer',
+   453→          type: 'raster',
+   454→          source: 'gibs-satellite',
+   455→          paint: { 'raster-opacity': 0.85 },
+   456→        },
+   457→        beforeId,
+   458→      );
+   459→      dynamicLayersRef.current.add('gibs-layer');
+   460→    }
+   461→    if (instance.getLayer('gibs-layer')) {
+   462→      instance.setLayoutProperty('gibs-layer', 'visibility', layers.satellite ? 'visible' : 'none');
+   463→    }
+   464→  }, [mapReady, layers.satellite, radarData]);
+   465→
+   466→  /* --------------------------- earthquakes --------------------------- */
+   467→
+   468→  useEffect(() => {
+   469→    if (!layers.quakes || quakes) return;
+   470→    const controller = new AbortController();
+   471→    fetch('/api/earthquakes', { signal: controller.signal })
+   472→      .then(async (res) => {
+   473→        if (!res.ok) throw new Error(`Earthquake feed failed (${res.status})`);
+   474→        return (await res.json()) as { quakes: GeoQuake[] };
+   475→      })
+   476→      .then((data) => {
+   477→        if (!controller.signal.aborted) setQuakes(data.quakes ?? []);
+   478→      })
+   479→      .catch(() => {
+   480→        /* silent — the layer simply stays empty */
+   481→      });
+   482→    return () => controller.abort();
+   483→  }, [layers.quakes, quakes]);
+   484→
+   485→  const quakesCollection = useMemo(
+   486→    () => (quakes ? quakesToCollection(quakes) : null),
+   487→    [quakes],
+   488→  );
+   489→
+   490→  useEffect(() => {
+   491→    const instance = mapRef.current;
+   492→    if (!instance || !mapReady) return;
+   493→    if (quakesCollection && !instance.getSource('quakes')) {
+   494→      instance.addSource('quakes', { type: 'geojson', data: quakesCollection });
+   495→      dynamicSourcesRef.current.add('quakes');
+   496→      instance.addLayer(
+   497→        {
+   498→          id: 'quakes-circles',
+   499→          type: 'circle',
+   500→          source: 'quakes',
+   501→          paint: {
+   502→            'circle-radius': [
+   503→              'interpolate',
+   504→              ['linear'],
+   505→              ['get', 'magnitude'],
+   506→              2.5,
+   507→              4,
+   508→              4,
+   509→              6,
+   510→              5,
+   511→              8.5,
+   512→              7,
+   513→              12,
+   514→            ],
+   515→            'circle-color': [
+   516→              'case',
+   517→              ['>=', ['get', 'magnitude'], 5],
+   518→              '#E1552F',
+   519→              ['>=', ['get', 'magnitude'], 4],
+   520→              '#E8C54D',
+   521→              '#45d1b3',
+   522→            ],
+   523→            'circle-opacity': 0.88,
+   524→            'circle-stroke-width': 1.2,
+   525→            'circle-stroke-color': 'rgba(255, 255, 255, 0.75)',
+   526→          },
+   527→        },
+   528→        'overlay-anchor',
+   529→      );
+   530→      dynamicLayersRef.current.add('quakes-circles');
+   531→    } else if (quakesCollection) {
+   532→      (instance.getSource('quakes') as GeoJSONSource | undefined)?.setData(quakesCollection);
+   533→    }
+   534→    if (instance.getLayer('quakes-circles')) {
+   535→      instance.setLayoutProperty('quakes-circles', 'visibility', layers.quakes ? 'visible' : 'none');
+   536→    }
+   537→  }, [mapReady, quakesCollection, layers.quakes]);
+   538→
+   539→  /* --------------------------- city pins ----------------------------- */
+   540→
+   541→  useEffect(() => {
+   542→    const instance = mapRef.current;
+   543→    if (!instance || !mapReady) return;
+   544→    const markers: MLMarker[] = [];
+   545→    const pins: Array<{ city: City; active: boolean }> = [
+   546→      ...savedCities.filter((c) => c.id !== city?.id).map((c) => ({ city: c, active: false })),
+   547→    ];
+   548→    if (city) pins.push({ city, active: true });
+   549→    for (const pin of pins) {
+   550→      const el = document.createElement('button');
+   551→      el.type = 'button';
+   552→      el.className = `aether-pin focus-ring ${pin.active ? 'aether-pin--active' : ''}`;
+   553→      el.title = pin.city.name;
+   554→      el.setAttribute(
+   555→        'aria-label',
+   556→        pin.active ? `${pin.city.name} — current city` : pin.city.name,
+   557→      );
+   558→      el.addEventListener('click', () => {
+   559→        instance.flyTo({
+   560→          center: [pin.city.longitude, pin.city.latitude],
+   561→          zoom: Math.max(instance.getZoom(), 7),
+   562→          duration: 900,
+   563→        });
+   564→      });
+   565→      markers.push(
+   566→        new maplibregl.Marker({ element: el })
+   567→          .setLngLat([pin.city.longitude, pin.city.latitude])
+   568→          .addTo(instance),
+   569→      );
+   570→    }
+   571→    return () => {
+   572→      for (const m of markers) m.remove();
+   573→    };
+   574→  }, [mapReady, savedCities, city]);
+   575→
+   576→  /* ---------------------------- playback ----------------------------- */
+   577→
+   578→  useEffect(() => {
+   579→    if (!radarPlaying || !layers.radar || radarTotal < 2) return;
+   580→    const id = window.setInterval(() => {
+   581→      if (document.hidden) return;
+   582→      setRadarIndex((i) => (i + 1) % radarTotal);
+   583→    }, 500);
+   584→    return () => window.clearInterval(id);
+   585→  }, [radarPlaying, layers.radar, radarTotal]);
+   586→
+   587→  useEffect(() => {
+   588→    if (!hourPlaying || (!layers.precip && !layers.temp)) return;
+   589→    const id = window.setInterval(() => {
+   590→      if (document.hidden) return;
+   591→      setHour((h) => (h + 1) % HOUR_STEPS);
+   592→    }, 800);
+   593→    return () => window.clearInterval(id);
+   594→  }, [hourPlaying, layers.precip, layers.temp]);
+   595→
+   596→  /* ------------------------ keyboard + focus ------------------------- */
+   597→
+   598→  useEffect(() => {
+   599→    const onKey = (event: KeyboardEvent) => {
+   600→      if (event.key === 'Escape') {
+   601→        if (popupDataRef.current) closePopup();
+   602→        else onClose();
+   603→        return;
+   604→      }
+   605→      if (event.key === 'Tab') {
+   606→        const root = rootRef.current;
+   607→        if (!root) return;
+   608→        const focusables = Array.from(
+   609→          root.querySelectorAll<HTMLElement>(
+   610→            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+   611→          ),
+   612→        ).filter((el) => (el as HTMLButtonElement).disabled !== true && el.offsetParent !== null);
+   613→        if (focusables.length === 0) return;
+   614→        const first = focusables[0];
+   615→        const last = focusables[focusables.length - 1];
+   616→        const active = document.activeElement;
+   617→        if (event.shiftKey && (active === first || !root.contains(active))) {
+   618→          event.preventDefault();
+   619→          last.focus();
+   620→        } else if (!event.shiftKey && (active === last || !root.contains(active))) {
+   621→          event.preventDefault();
+   622→          first.focus();
+   623→        }
+   624→      }
+   625→    };
+   626→    document.addEventListener('keydown', onKey);
+   627→    return () => document.removeEventListener('keydown', onKey);
+   628→  }, [closePopup, onClose]);
+   629→
+   630→  /* ----------------------------- chrome ------------------------------ */
+   631→
+   632→  const toggleLayer = useCallback((key: MapLayerKey) => {
+   633→    setLayers((prev) => ({ ...prev, [key]: !prev[key] }));
+   634→  }, []);
+   635→
+   636→  const handleBasemap = useCallback((kind: 'dark' | 'light') => {
+   637→    setBasemapTouched(true);
+   638→    setBasemap(kind);
+   639→  }, []);
+   640→
+   641→  const radarTimeLabel = useMemo(() => {
+   642→    if (radarTotal === 0) return radarError ? 'Radar unavailable' : null;
+   643→    const frame = radarData!.frames[Math.min(radarIndex, radarTotal - 1)];
+   644→    const time = new Date(frame.time * 1000).toLocaleTimeString([], {
+   645→      hour: '2-digit',
+   646→      minute: '2-digit',
+   647→    });
+   648→    const minutesAgo = Math.max(0, Math.round((Date.now() / 1000 - frame.time) / 60));
+   649→    return minutesAgo < 1 ? `${time} · now` : `${time} · ${minutesAgo}m ago`;
+   650→  }, [radarData, radarIndex, radarTotal, radarError]);
+   651→
+   652→  const legend: LegendInfo | null = useMemo(() => {
+   653→    const note = hour === 0 ? 'Now' : `+${hour}h`;
+   654→    if (layers.radar) {
+   655→      return {
+   656→        label: 'Radar',
+   657→        ramp: RADAR_RAMP,
+   658→        ticks: ['light', 'heavy'],
+   659→        note: radarError ? 'Unavailable' : 'Past 2h · RainViewer',
+   660→      };
+   661→    }
+   662→    if (layers.precip) {
+   663→      return {
+   664→        label: 'Precipitation',
+   665→        ramp: PRECIP_RAMP,
+   666→        ticks: ['0', '4', '8+ mm/h'],
+   667→        note,
+   668→      };
+   669→    }
+   670→    if (layers.temp) {
+   671→      return {
+   672→        label: 'Temperature',
+   673→        ramp: TEMP_RAMP,
+   674→        ticks: units === 'metric' ? ['-15°', '10°', '35°'] : ['5°', '50°', '95°'],
+   675→        note,
+   676→      };
+   677→    }
+   678→    if (layers.wind) {
+   679→      return {
+   680→        label: 'Wind',
+   681→        ramp: WIND_RAMP,
+   682→        ticks: units === 'metric' ? ['0', '30', '60+ km/h'] : ['0', '20', '40+ mph'],
+   683→        note: windGrid.error ? 'Unavailable' : note,
+   684→      };
+   685→    }
+   686→    return null;
+   687→  }, [layers, hour, units, radarError, windGrid.error]);
+   688→
+   689→  const gridLoading = (layers.wind && windGrid.loading) || (layers.precip && precipGrid.loading) || (layers.temp && tempGrid.loading);
+   690→
+   691→  return (
+   692→    <div
+   693→      ref={rootRef}
+   694→      role="dialog"
+   695→      aria-modal="true"
+   696→      aria-label="Map mode — live weather layers"
+   697→      className="fixed inset-0 z-[80] flex flex-col"
+   698→    >
+   699→      {/* Top chrome — Clear LiquidGlass over the map (dimming scrim built in) */}
+   700→      <LiquidGlass
+   701→        variant="clear"
+   702→        className="relative z-30 flex items-center gap-2 px-3 py-2"
+   703→      >
+   704→        <span
+   705→          aria-hidden="true"
+   706→          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-aurora-300"
+   707→        >
+   708→          <Icon name="map" size={18} animated />
+   709→        </span>
+   710→        <div className="min-w-0 flex-1">
+   711→          <p className="text-sm font-semibold leading-tight text-surface">Aether Map</p>
+   712→          <p className="truncate text-[11px] leading-tight text-surface-muted">
+   713→            {city
+   714→              ? `${city.name}${city.country ? ` · ${city.country}` : ''}`
+   715→              : 'Live weather layers around the world'}
+   716→          </p>
+   717→        </div>
+   718→        <button
+   719→          type="button"
+   720→          onClick={() => setPickerOpen((open) => !open)}
+   721→          aria-label={pickerOpen ? 'Close layers panel' : 'Open layers panel'}
+   722→          aria-pressed={pickerOpen}
+   723→          className={`focus-ring flex h-9 w-9 items-center justify-center rounded-full bg-white/10 transition-all duration-200 ${
+   724→            pickerOpen
+   725→              ? 'border-aurora-500/50 bg-aurora-500/15 text-aurora-400'
+   726→              : 'text-surface-muted hover:text-surface'
+   727→          }`}
+   728→        >
+   729→          <Icon name="layers" size={17} />
+   730→        </button>
+   731→        <button
+   732→          ref={closeBtnRef}
+   733→          type="button"
+   734→          onClick={onClose}
+   735→          aria-label="Close map (Escape)"
+   736→          title="Close (Esc)"
+   737→          className="focus-ring flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/85 transition-colors duration-200 hover:text-white"
+   738→        >
+   739→          <Icon name="x" size={17} />
+   740→        </button>
+   741→      </LiquidGlass>
+   742→
+   743→      {/* Map viewport */}
+   744→      <div className="aether-map relative min-h-0 flex-1">
+   745→        <div ref={containerRef} className="absolute inset-0" aria-label="Interactive weather map" />
+   746→
+   747→        {map && layers.precip && <HeatCanvas map={map} grid={precipGrid.data} metric="precip" />}
+   748→        {map && layers.temp && <HeatCanvas map={map} grid={tempGrid.data} metric="temp" />}
+   749→        {map && layers.wind && <WindParticles map={map} grid={windGrid.data} />}
+   750→
+   751→        <MapLegend legend={legend} loading={gridLoading} />
+   752→
+   753→        <TimeScrubber
+   754→          showRadar={layers.radar}
+   755→          radarIndex={radarIndex}
+   756→          radarTotal={radarTotal}
+   757→          radarTimeLabel={radarTimeLabel}
+   758→          radarHiddenByZoom={radarHiddenByZoom}
+   759→          radarPlaying={radarPlaying}
+   760→          onRadarIndex={setRadarIndex}
+   761→          onRadarPlaying={setRadarPlaying}
+   762→          showHour={layers.precip || layers.temp}
+   763→          hour={hour}
+   764→          hourPlaying={hourPlaying}
+   765→          onHour={setHour}
+   766→          onHourPlaying={setHourPlaying}
+   767→        />
+   768→
+   769→        <LayerPicker
+   770→          open={pickerOpen}
+   771→          onClose={() => setPickerOpen(false)}
+   772→          layers={layers}
+   773→          onToggleLayer={toggleLayer}
+   774→          basemap={basemap}
+   775→          onBasemap={handleBasemap}
+   776→        />
+   777→
+   778→        {popupContainer &&
+   779→          popupData &&
+   780→          createPortal(
+   781→            popupData.kind === 'point' ? (
+   782→              <PointPopup
+   783→                key={`${popupData.lng},${popupData.lat}`}
+   784→                lng={popupData.lng}
+   785→                lat={popupData.lat}
+   786→                units={units}
+   787→                onClose={closePopup}
+   788→              />
+   789→            ) : (
+   790→              <QuakePopup key={popupData.quake.id} quake={popupData.quake} onClose={closePopup} />
+   791→            ),
+   792→            popupContainer,
+   793→          )}
+   794→      </div>
+   795→    </div>
+   796→  );
+   797→}
+   798→

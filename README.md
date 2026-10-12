@@ -8,7 +8,7 @@ Aether is a ground-up rebuild of [OmKardile/weather-nextjs](https://github.com/O
 
 ## Features
 
-**Liquid Glass design system (macOS Tahoe)** — a two-layer iOS 27 material system — `<LiquidGlass>` controls (runtime 3-pass RGB refraction, opposing-corner rim light, press gel, ≤3 lens filters) over flat `<Glass>`/Surface content cards, with a hero composed directly on the sky. Every surface adapts to the live weather via `[data-tint]`/`[data-surface]`, and a Settings transparency slider (Ultra Clear → Fully Tinted) drives tint, blur, refraction and rim brightness.
+**Liquid Glass design system (macOS Tahoe)** — a two-layer iOS 27 material system — `<LiquidGlass>` controls (runtime 3-pass RGB refraction, opposing-corner rim light, press gel, ≤3 lens filters) over flat `<Glass>`/Surface content cards, with a hero composed directly on the sky. Every surface adapts to the live weather via `[data-tint]`/`[data-surface]`, and a Settings transparency slider (Ultra Clear → Fully Tinted) drives tint, blur, refraction and rim brightness. On devices with a motion sensor, an opt-in **Tilt highlights** setting makes the specular light drift with the physical tilt of the device (permission-gated on iOS).
 
 **macOS window layout**
 - Slim menu bar whose center morphs from city + live clock into a compact icon + temp + condition chip as the hero scrolls away (iOS Weather behavior)
@@ -29,12 +29,12 @@ Aether is a ground-up rebuild of [OmKardile/weather-nextjs](https://github.com/O
 
 **Weather data (Open-Meteo)**
 - City search with debounced autocomplete (300 ms, country flags, full keyboard navigation, `/` shortcut)
-- Current conditions with a live location-local clock, feels-like, today's hi/lo
+- Current conditions with a live location-local clock, feels-like, today's hi/lo, and a **“+2° vs yesterday” chip** (today's forecast high vs yesterday's measured high — trend icon, color-coded direction)
 - 48-hour hourly strip (hourly wind speed included) plus a hand-rolled interactive SVG temperature chart (hover/touch scrub, keyboard-navigable, precipitation-probability bars)
 - 7-day forecast with week-normalized temperature range bars
 - Full metric grid: wind speed + 16-point compass direction, humidity + dew point, UV index with scale marker, visibility, pressure, cloud cover, precipitation chance, and a sun-arc with live daylight progress
 - Moon phase card — phase name, illumination % and a full-moon countdown (zero-dependency calculation)
-- European Air Quality Index (EAQI) with pollutant breakdown (PM2.5 / PM10 / O₃ / NO₂) and dominant pollutant
+- European Air Quality Index (EAQI) with pollutant breakdown (PM2.5 / PM10 / O₃ / NO₂), dominant pollutant, and a **24-hour AQI trend sparkline** (band-colored line, peak marker with time, screen-reader summary)
 
 **UX niceties**
 - Geolocation with graceful fallback (permission denied → friendly toast, not a dead end)
@@ -170,7 +170,7 @@ The material system is a faithful two-layer implementation of Apple's Liquid Gla
 1. **Backdrop** — Chromium: `backdrop-filter: url(#refraction-filter) blur(2px) saturate(1.7) brightness(1.05)`; everyone else: `blur(18px+) saturate(1.8)` (clean fallback, zero layout shift).
 2. **Refraction filter** — generated at runtime (`src/lib/liquid.ts`): a displacement map rasterized on a canvas from a rounded-rect signed-distance field (squircle profile ≈ Snell's law, IOR ~1.5, 12–20px bezel, zero displacement at center so content stays crisp), fed through **three feDisplacementMap passes isolated per RGB channel** (scales 1.00 / 1.05 / 1.10) recombined with `feBlend screen` — the faint chromatic fringe at the rim. Filter region extends −20 %/+140 %. Cached by (w, h, radius), regenerated on resize, and **budgeted to ≤ 3 live filters** (dock, top-bar cluster, one more).
 3. **Tint** — very light and scene-luminance aware: dark scenes `rgba(255,255,255,.05–.10)`, light scenes `.18–.28` + 4 % black. Never above 0.3 at default.
-4. **Edge + light** — a 1px **opposing-corner rim** (bright ~.6 top-left *and* bottom-right, faint ~.08 on the other corners) via mask, `inset 0 1px 0 rgba(255,255,255,.5)` top highlight, inner hairline, soft inner glow; a pointer-following specular blob (rAF-throttled, desktop only, off under reduced motion); layered shadow `0 10px 30px / 0 2px 6px` that **intensifies while content scrolls beneath** (`.lg-boosted`).
+4. **Edge + light** — a 1px **opposing-corner rim** (bright ~.6 top-left *and* bottom-right, faint ~.08 on the other corners) via mask, `inset 0 1px 0 rgba(255,255,255,.5)` top highlight, inner hairline, soft inner glow; a pointer-following specular blob (rAF-throttled, desktop only, off under reduced motion) that on motion-sensor devices **doubles as the tilt light** — with Tilt highlights enabled the ambient specular drifts with the device's physical tilt (pointer input always wins when present); layered shadow `0 10px 30px / 0 2px 6px` that **intensifies while content scrolls beneath** (`.lg-boosted`).
 
 **Interaction** — press = scale .96 + brighten (gel flex), release springs back with a small overshoot. Selected segments (unit toggle, dock tabs, segmented controls) are an **inner lighter glass capsule** that morphs between positions with a framer-motion `layoutId` spring and a brief `scaleX` stretch mid-travel.
 
@@ -179,6 +179,8 @@ The material system is a faithful two-layer implementation of Apple's Liquid Gla
 **Layer 2 — CONTENT (Surface)**. All cards are deliberately flat: `blur(22px) saturate(1.4)`, tint `.08–.14` (dark scenes), 1px hairline, soft shadow — no refraction, no specular, so controls pop above it. Chips and scrolling-list rows (`.glass-subtle` / `.surface-subtle`) are **plain fills with no backdrop-filter**. Never glass-on-glass; never more than 2 stacked translucent layers.
 
 **The transparency slider** (Settings → *Liquid Glass*) spans **Ultra Clear → Fully Tinted** and drives everything: tint alpha `.04 → .55`, blur `2px → 28px`, refraction strength `1.0 → 0.25`, rim brightness `1.0 → 0.35`, plus the Surface card tint. It honors `prefers-reduced-transparency` (forces fully tinted, no refraction), `prefers-contrast: more` (stronger rim + tint), `prefers-reduced-motion` (no specular / gel), and a **Reduce bright effects** toggle (kills specular + chromatic fringe).
+
+**Tilt highlights** (`use-tilt-glow.ts`, off by default) — the mobile counterpart of the pointer specular: `deviceorientation` → normalized `--tilt-x/y` custom properties on `<html>` (rAF-throttled CSS repaints), consumed by the specular layer as its position fallback. iOS 13+ permission is requested from the Settings switch (a denial shows a recovery hint); reduced-motion and Reduce bright effects both disable it. On fine-pointer devices the pointer light always takes precedence.
 
 **Hero** — no panel at all: city, a giant thin temperature (`clamp(104px, 24vw, 176px)`, weight 200, tracking −0.045em, white with soft text-shadow), condition and H/L render **directly on the animated scene**, with the glowing weather glyph (~200px) beside them and quick stats as a row of Surface chips. A scene-aware scrim (stronger on light skies) keeps the white text AA.
 

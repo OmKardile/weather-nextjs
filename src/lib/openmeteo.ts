@@ -290,6 +290,7 @@ interface OmAirQuality {
     ragweed_pollen?: (number | null)[];
     olive_pollen?: (number | null)[];
     mugwort_pollen?: (number | null)[];
+    european_aqi?: (number | null)[];
   };
 }
 
@@ -433,17 +434,46 @@ function extractPollen(air: OmAirQuality | null): Pollen | null {
   };
 }
 
+/**
+ * Next-24h European AQI trend from the piggybacked hourly field. Returns null
+ * when the hourly array is missing or entirely null (air-quality call failed
+ * or the region is uncovered) so the card can omit the sparkline.
+ */
+function extractAqiTrend(air: OmAirQuality | null): AirQuality['trend'] {
+  const hourly = air?.hourly;
+  const values = hourly?.european_aqi;
+  if (!hourly || !values || hourly.time.length === 0) return null;
+
+  const anchor = air.current?.time ?? hourly.time[0];
+  let start = hourly.time.findIndex((t) => t >= anchor);
+  if (start < 0) start = 0;
+  const end = Math.min(start + 24, hourly.time.length, values.length);
+
+  const points: Array<{ time: string; value: number }> = [];
+  for (let i = start; i < end; i += 1) {
+    const value = values[i];
+    if (value != null && Number.isFinite(value)) {
+      points.push({ time: hourly.time[i], value });
+    }
+  }
+  return points.length >= 4 ? points : null;
+}
+
 export async function fetchWeatherBundle(lat: number, lon: number): Promise<WeatherBundle> {
   const forecastUrl =
     `${FORECAST_URL}?latitude=${lat}&longitude=${lon}` +
     `&current=${CURRENT_FIELDS}&hourly=${HOURLY_FIELDS}&daily=${DAILY_FIELDS}` +
-    `&timezone=auto&forecast_days=16&past_hours=1&forecast_hours=54`;
+    // past_days=1 prepends yesterday to the daily arrays (17 rows) so the
+    // hero can show a "vs yesterday" delta; past_hours=1 still governs the
+    // hourly anchor, so the hourly arrays are unchanged (verified upstream).
+    `&timezone=auto&forecast_days=16&past_hours=1&forecast_hours=54&past_days=1`;
 
-  // Pollen piggybacks on the air-quality call (same upstream, one request).
+  // Pollen piggybacks on the air-quality call (same upstream, one request);
+  // hourly european_aqi rides along for the 24h air-quality trend.
   const airUrl =
     `${AIR_QUALITY_URL}?latitude=${lat}&longitude=${lon}` +
     `&current=european_aqi,us_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone` +
-    `&hourly=${POLLEN_FIELDS}&forecast_days=3&timezone=auto`;
+    `&hourly=${POLLEN_FIELDS},european_aqi&forecast_days=3&timezone=auto`;
 
   // Dedicated nowcast call. forecast_days=2 (not 1) so the 2-hour window is
   // fully covered even shortly before local midnight.
@@ -460,28 +490,50 @@ export async function fetchWeatherBundle(lat: number, lon: number): Promise<Weat
   ]);
 
   const current = forecast.current;
-  const daily: DailyPoint[] = forecast.daily.time.slice(0, 16).map((date, i) => ({
+  // past_days=1 → daily[0] is yesterday; the visible 16-day horizon starts
+  // at index 1. With past_days absent upstream the arrays fall back cleanly.
+  const dailyStart =
+    forecast.daily.time.length > 16 &&
+    forecast.daily.time[0] !== current.time.slice(0, 10)
+      ? 1
+      : 0;
+  const daily: DailyPoint[] = forecast.daily.time
+    .slice(dailyStart, dailyStart + 16)
+    .map((date, i) => ({
     date,
-    weatherCode: num(forecast.daily.weather_code[i], 0),
-    tempMax: num(forecast.daily.temperature_2m_max[i], 0),
-    tempMin: num(forecast.daily.temperature_2m_min[i], 0),
-    sunrise: forecast.daily.sunrise[i] ?? `${date}T06:00`,
-    sunset: forecast.daily.sunset[i] ?? `${date}T18:00`,
+    weatherCode: num(forecast.daily.weather_code[dailyStart + i], 0),
+    tempMax: num(forecast.daily.temperature_2m_max[dailyStart + i], 0),
+    tempMin: num(forecast.daily.temperature_2m_min[dailyStart + i], 0),
+    sunrise: forecast.daily.sunrise[dailyStart + i] ?? `${date}T06:00`,
+    sunset: forecast.daily.sunset[dailyStart + i] ?? `${date}T18:00`,
     // Civil twilight (sun at −6°), derived from solar geometry per day — see
     // approxCivilTwilightMinutes for why this is not an upstream field.
     civilTwilightBegin: shiftLocalMinutes(
-      forecast.daily.sunrise[i] ?? `${date}T06:00`,
+      forecast.daily.sunrise[dailyStart + i] ?? `${date}T06:00`,
       -approxCivilTwilightMinutes(lat, date),
     ),
     civilTwilightEnd: shiftLocalMinutes(
-      forecast.daily.sunset[i] ?? `${date}T18:00`,
+      forecast.daily.sunset[dailyStart + i] ?? `${date}T18:00`,
       approxCivilTwilightMinutes(lat, date),
     ),
-    precipitationProbabilityMax: num(forecast.daily.precipitation_probability_max[i], 0),
-    uvIndexMax: num(forecast.daily.uv_index_max[i], 0),
-    windSpeedMax: num(forecast.daily.wind_speed_10m_max[i], 0),
-    condition: conditionOf(num(forecast.daily.weather_code[i], 0)),
+    precipitationProbabilityMax: num(
+      forecast.daily.precipitation_probability_max[dailyStart + i],
+      0,
+    ),
+    uvIndexMax: num(forecast.daily.uv_index_max[dailyStart + i], 0),
+    windSpeedMax: num(forecast.daily.wind_speed_10m_max[dailyStart + i], 0),
+    condition: conditionOf(num(forecast.daily.weather_code[dailyStart + i], 0)),
   }));
+
+  /** Yesterday's measured high/low (daily[0] with past_days=1). */
+  const yesterday: WeatherBundle['yesterday'] =
+    dailyStart === 1
+      ? {
+          date: forecast.daily.time[0],
+          tempMax: num(forecast.daily.temperature_2m_max[0], 0),
+          tempMin: num(forecast.daily.temperature_2m_min[0], 0),
+        }
+      : null;
 
   const airQuality: AirQuality | null = air?.current
     ? {
@@ -494,6 +546,7 @@ export async function fetchWeatherBundle(lat: number, lon: number): Promise<Weat
         so2: air.current.sulphur_dioxide ?? null,
         co: air.current.carbon_monoxide ?? null,
         time: air.current.time,
+        trend: extractAqiTrend(air),
       }
     : null;
 
@@ -515,6 +568,7 @@ export async function fetchWeatherBundle(lat: number, lon: number): Promise<Weat
     },
     hourly: sliceCurrentHour(forecast),
     daily,
+    yesterday,
     airQuality,
     minutely: sliceMinutely(minutelyForecast, current.time),
     pollen: extractPollen(air),

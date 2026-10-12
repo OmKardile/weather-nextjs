@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.2.0] — 2026-10-12
+
+QA-driven round: a persisted-city robustness crash fixed, two data
+features (yesterday comparison + air-quality trend), and the final
+Liquid Glass spec item — device-tilt highlights.
+
+### Added
+- **"vs yesterday" hero chip** — the forecast request now asks for
+  `past_days=1`, so the daily arrays gain yesterday's measured high/low
+  while the hourly anchor (`past_hours=1`) is untouched (verified
+  upstream). The hero quick-stat row gains a fourth Surface chip:
+  today's forecast high vs yesterday's measured high, signed
+  (`+2° / −3° / ±0°`), with a trending icon (amber when warmer, aurora
+  teal when cooler, minus when flat, ±0.5° tolerance). Degrades to
+  nothing when upstream omits yesterday.
+- **24-hour air-quality trend** — `european_aqi` rides along on the
+  existing air-quality call (no extra request). The Air-quality card
+  gains a sparkline: band-colored line + gradient area, a peak marker
+  with a "peaks 19:00 · 42" caption, a dashed "now" reference line, and
+  a screen-reader summary ("now 34 (Fair), peaking 42 around 19:00").
+  The expanded card shows the taller variant with hour ticks. Omitted
+  where CAMS hourly data is missing.
+- **Device-tilt highlights** (`use-tilt-glow.ts`) — the last item of the
+  Liquid Glass brief: on devices with a motion sensor the ambient
+  specular on glass controls drifts with the physical tilt of the device
+  (like a light source fixed in the room). The hook writes
+  `--tilt-x/y/--tilt-on` on `<html>` (rAF-throttled CSS repaints, no
+  layout); `.lg::after` uses them as position fallbacks whenever a
+  pointer hasn't lit the control — pointer always wins. iOS 13+
+  `requestPermission()` is honored via the new **Tilt highlights** switch
+  in Settings (persists `tiltGlowEnabled`; shows a recovery hint when
+  motion access is denied). Never active under reduced motion or
+  Reduce bright effects.
+
+### Fixed
+- **Malformed persisted cities crashed the app** — `localStorage` is
+  untrusted: a hand-edited or legacy `aether-preferences` payload with
+  `lat`/`lon` instead of `latitude`/`longitude` (or non-finite
+  coordinates) made MapLibre throw `new LngLat(NaN, NaN)` on map open —
+  white-screen crash of the whole app — and silently anchored the
+  weather query at (0, 0). The zustand `merge` now normalizes every
+  persisted city (aliases coerced, numeric-string ids coerced,
+  unrecoverable rows dropped, invalid `lastCity` nulled), and MapOverlay
+  guards its constructor/flyTo/marker coordinates as defense-in-depth
+  (falls back to the neutral world view). Reproduced the crash before
+  the fix, verified the recovery after.
+
+### Changed
+- **Card hover lift** — forecast cards (ExpandableCard + MarineCard)
+  rise 2px on hover with a deeper shadow and a top-edge highlight
+  (`.card-lift`): fine pointers only, never under reduced motion, and
+  never on chips/pills (those keep the existing fill-brighten hover).
+- **Dock active icon** — the selected tab's icon now scales to 110 %
+  with a soft white glow, echoing the `lg-selected` capsule language.
+- **Hero chips** — quick-stat pills get a springy press feedback
+  (`active:scale-95`), matching the control layer's gel press.
+
 ## [3.1.0] — 2026-10-12
 
 The frosted-glassmorphism overhaul: the entire material system is replaced

@@ -10,6 +10,7 @@ import { Icon } from '@/components/icons/Icon';
 import { useEditMode } from '@/hooks/use-edit-mode';
 import { usePreferences } from '@/hooks/use-preferences';
 import type { Density } from '@/hooks/use-preferences';
+import { requestTiltPermission } from '@/hooks/use-tilt-glow';
 import { toggleAmbientSound } from '@/hooks/use-ambient-sound';
 import { useAchievements } from '@/hooks/use-achievements';
 import { ACHIEVEMENTS } from '@/lib/achievements';
@@ -155,6 +156,46 @@ function ReduceBrightEffectsControl(): JSX.Element {
       onCheckedChange={setReduceBright}
       aria-label="Reduce bright effects"
     />
+  );
+}
+
+/**
+ * Tilt highlights — device-motion glass specular (Liquid Glass spec's
+ * permission-gated mobile item). iOS 13+ requires requestPermission()
+ * from a user gesture: the switch handler asks first and only enables
+ * on grant; elsewhere the sensor needs no permission.
+ */
+function TiltGlowControl(): JSX.Element {
+  const hydrated = useHydrated();
+  const tiltGlow = usePreferences((s) => s.tiltGlowEnabled);
+  const setTiltGlow = usePreferences((s) => s.setTiltGlowEnabled);
+  const [denied, setDenied] = useState(false);
+
+  const onCheckedChange = async (next: boolean): Promise<void> => {
+    if (!next) {
+      setDenied(false);
+      setTiltGlow(false);
+      return;
+    }
+    const granted = await requestTiltPermission();
+    setDenied(!granted);
+    setTiltGlow(granted);
+  };
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <Switch
+        checked={hydrated && tiltGlow}
+        onCheckedChange={onCheckedChange}
+        aria-label="Tilt highlights"
+        disabled={!hydrated}
+      />
+      {denied && (
+        <p role="alert" className="text-right text-[10px] leading-tight text-aurora-300">
+          Motion access was denied — enable it in iOS Settings › Safari.
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -407,6 +448,13 @@ export function SettingsContent({
         <ReduceBrightEffectsControl />
       </SettingsRow>
 
+      <SettingsRow
+        label="Tilt highlights"
+        hint="Glass highlights drift with your device's motion — needs motion access on iOS."
+      >
+        <TiltGlowControl />
+      </SettingsRow>
+
       <SettingsRow label="Card density" hint="Comfortable spacing or a tighter fit">
         <Segmented
           ariaLabel="Card density"
@@ -465,7 +513,7 @@ export function SettingsContent({
 
       <div className="py-3.5">
         <p className="text-xs leading-relaxed text-surface-faint">
-          Aether 3.1.1 · forecast &amp; air quality by Open-Meteo (CAMS) · geocoding by
+          Aether 3.2.0 · forecast &amp; air quality by Open-Meteo (CAMS) · geocoding by
           Open-Meteo &amp; Nominatim · AI by Gemini
         </p>
       </div>

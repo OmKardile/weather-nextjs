@@ -50,7 +50,7 @@ export function MarineCard({ city, units }: MarineCardProps) {
   const period = today.wavePeriodMax;
 
   return (
-    <div className="glass glass-hover rounded-[var(--radius-card)] p-4">
+    <div className="glass card-lift rounded-[var(--radius-card)] p-4">
       <p className="flex items-center gap-1.5 card-label">
         <Waves className="h-3.5 w-3.5" aria-hidden="true" />
         Marine

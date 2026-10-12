@@ -562,7 +562,7 @@ export function ExpandableCard({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <div className={cn('glass glass-hover rounded-[var(--radius-card)] p-4', className)}>
+      <div className={cn('glass card-lift rounded-[var(--radius-card)] p-4', className)}>
         <DialogTrigger asChild>
           <button
             type="button"

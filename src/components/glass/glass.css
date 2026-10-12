@@ -99,7 +99,10 @@
 }
 
 /* Specular blob — pointer-following (useSpecular writes --spec-x/y and
-   --spec-active). Hidden under Reduce bright effects (.lg-calm). */
+   --spec-active). Hidden under Reduce bright effects (.lg-calm).
+   Tilt fallback: before a pointer lights the element, the blob sits at
+   the device-tilt position (useTiltGlow writes --tilt-x/y/--tilt-on on
+   <html>, rAF-throttled; no motion sensor → vars unset → parked). */
 .lg::after {
   content: '';
   position: absolute;
@@ -107,11 +110,11 @@
   border-radius: inherit;
   pointer-events: none;
   background: radial-gradient(
-    420px circle at var(--spec-x, 50%) var(--spec-y, -40%),
+    420px circle at var(--spec-x, calc(50% + var(--tilt-x, 0) * 38%)) var(--spec-y, calc(-14% + var(--tilt-y, 0) * 46%)),
     rgb(255 255 255 / 0.14),
     transparent 60%
   );
-  opacity: var(--spec-active, 0);
+  opacity: max(var(--spec-active, 0), calc(var(--tilt-on, 0) * 0.5));
   transition: opacity 480ms var(--ease-soft, cubic-bezier(0.4, 0, 0.2, 1));
   z-index: 1;
 }
@@ -298,6 +301,40 @@
 [data-surface='light'] .glass-hover:hover {
   background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.18));
   border-color: rgb(14 42 46 / 0.16);
+}
+
+/* Card lift — forecast cards rise a hair on hover (fine pointers only,
+   none under reduced motion): fill brighten + translateY(−2px) + deeper
+   shadow + a top edge highlight, reading as depth rather than motion.
+   Applies to full forecast cards, never to chips or inline pills. */
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .card-lift {
+    transition:
+      transform 340ms var(--ease-soft, ease),
+      background-color 340ms var(--ease-soft, ease),
+      border-color 340ms var(--ease-soft, ease),
+      box-shadow 340ms var(--ease-soft, ease);
+    will-change: transform;
+  }
+
+  .card-lift:hover {
+    transform: translateY(-2px);
+    background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.05));
+    border-color: rgb(255 255 255 / 0.2);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.08),
+      0 12px 32px rgb(0 0 0 / 0.18),
+      0 2px 8px rgb(0 0 0 / 0.1);
+  }
+
+  [data-surface='light'] .card-lift:hover {
+    background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.16));
+    border-color: rgb(14 42 46 / 0.16);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.55),
+      0 12px 32px rgb(66 92 88 / 0.2),
+      0 2px 8px rgb(66 92 88 / 0.12);
+  }
 }
 
 /* ------------------------------------------------------------------ */

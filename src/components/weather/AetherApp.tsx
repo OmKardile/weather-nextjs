@@ -16,6 +16,7 @@ import { getDayPhase } from '@/lib/time';
 import type { City, Condition, DayPhase, WeatherBundle } from '@/types/weather';
 import { Glass } from '@/components/glass/Glass';
 import { useLiquidGlassVars } from '@/components/glass/LiquidGlass';
+import { useTiltGlow } from '@/hooks/use-tilt-glow';
 import { Icon } from '@/components/icons/Icon';
 import { AlertDigest } from '@/components/ai/AlertDigest';
 import { OfficialAlerts } from '@/components/alerts/OfficialAlerts';
@@ -344,6 +345,12 @@ export function AetherApp() {
   // Liquid Glass material pipeline — CSS vars on the ROOT element (no
   // extra wrapper div: it would shift useId paths and break hydration).
   const liquidGlassVars = useLiquidGlassVars();
+
+  // Device-tilt ambient glass highlight (motion sensor; permission-gated
+  // on iOS via the Settings switch). Off with Reduce bright effects.
+  const tiltGlowEnabled = usePreferences((state) => state.tiltGlowEnabled);
+  const reduceBrightEffects = usePreferences((state) => state.reduceBrightEffects);
+  useTiltGlow(tiltGlowEnabled && !reduceBrightEffects);
 
   const statusText = !mounted
     ? ''

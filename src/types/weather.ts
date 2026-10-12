@@ -100,6 +100,8 @@ export interface AirQuality {
   so2: number | null;
   co: number | null;
   time: string;
+  /** Next-24h European AQI points for the trend sparkline; null when uncovered. */
+  trend?: Array<{ time: string; value: number }> | null;
 }
 
 export interface WeatherBundle {
@@ -108,6 +110,8 @@ export interface WeatherBundle {
   hourly: HourlyPoint[];
   /** 16 days starting today. */
   daily: DailyPoint[];
+  /** Yesterday's measured high/low (past_days=1 upstream); null when unavailable. */
+  yesterday?: { date: string; tempMax: number; tempMin: number } | null;
   airQuality: AirQuality | null;
   /** 15-minute precipitation nowcast for the next 2 hours (8 points); null when the nowcast call fails. */
   minutely?: MinutelyPoint[] | null;

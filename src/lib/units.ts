@@ -16,6 +16,14 @@ export function formatTemp(celsius: number, units: Units): string {
   return `${displayTemp(celsius, units)}°`;
 }
 
+/** Signed temperature *difference* in display units, e.g. "+2°" / "−3°". */
+export function formatTempDelta(deltaCelsius: number, units: Units): string {
+  const delta = units === 'metric' ? deltaCelsius : deltaCelsius * (9 / 5);
+  const rounded = Math.round(Math.abs(delta));
+  const sign = delta >= 0.5 ? '+' : delta <= -0.5 ? '−' : '±';
+  return `${sign}${rounded}°`;
+}
+
 export function formatWind(kmh: number, units: Units): string {
   if (units === 'metric') return `${Math.round(kmh)} km/h`;
   return `${Math.round(kmhToMph(kmh))} mph`;

@@ -1,13 +1,31 @@
 'use client';
 
 import { format } from 'date-fns';
-import { Bookmark, BookmarkCheck, Droplets, RefreshCw, Sunrise, Wind } from 'lucide-react';
+import {
+  Bookmark,
+  BookmarkCheck,
+  Droplets,
+  Minus,
+  RefreshCw,
+  Sunrise,
+  TrendingDown,
+  TrendingUp,
+  Wind,
+} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { WeatherIcon } from '@/components/weather/WeatherIcon';
 import { ShareCardButton } from '@/components/weather/ShareCardButton';
 import { LiquidGlass } from '@/components/glass/LiquidGlass';
 import { formatLocalClock, formatLocalDate } from '@/lib/time';
-import { compassPoint, countryFlag, displayTemp, formatHour, formatTemp, formatWind } from '@/lib/units';
+import {
+  compassPoint,
+  countryFlag,
+  displayTemp,
+  formatHour,
+  formatTemp,
+  formatTempDelta,
+  formatWind,
+} from '@/lib/units';
 import { conditionLabel } from '@/lib/wmo';
 import type { City, Units, WeatherBundle } from '@/types/weather';
 import { cn } from '@/lib/utils';
@@ -37,21 +55,61 @@ function StatChip({
   icon,
   label,
   value,
+  iconClassName,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
+  iconClassName?: string;
 }) {
   return (
-    <div className="surface rounded-full px-3.5 py-2">
+    <div className="surface rounded-full px-3.5 py-2 transition-transform duration-200 ease-[var(--ease-spring-bouncy)] active:scale-95">
       <p className="flex items-center gap-2 text-[13px] leading-none text-surface">
-        <span className="text-surface-muted" aria-hidden="true">
+        <span className={iconClassName ?? 'text-surface-muted'} aria-hidden="true">
           {icon}
         </span>
         <span className="font-medium">{value}</span>
         <span className="text-[12px] text-surface-muted">{label}</span>
       </p>
     </div>
+  );
+}
+
+/** "vs yesterday" quick stat — compares today's forecast high with yesterday's measured high. */
+function YesterdayChip({
+  today,
+  yesterday,
+  units,
+}: {
+  today: { tempMax: number } | undefined;
+  yesterday: { tempMax: number; tempMin: number } | null | undefined;
+  units: Units;
+}) {
+  if (!today || !yesterday) return null;
+  const delta = today.tempMax - yesterday.tempMax;
+  // ±0.5° counts as "same" — no directional icon, neutral tone.
+  const direction = delta > 0.5 ? 'up' : delta < -0.5 ? 'down' : 'flat';
+  return (
+    <StatChip
+      icon={
+        direction === 'up' ? (
+          <TrendingUp className="h-4 w-4" />
+        ) : direction === 'down' ? (
+          <TrendingDown className="h-4 w-4" />
+        ) : (
+          <Minus className="h-4 w-4" />
+        )
+      }
+      iconClassName={
+        direction === 'up'
+          ? 'text-amber-300'
+          : direction === 'down'
+            ? 'text-aurora-300'
+            : 'text-surface-muted'
+      }
+      label="vs yesterday"
+      value={formatTempDelta(delta, units)}
+    />
   );
 }
 
@@ -64,7 +122,7 @@ export function CurrentWeather({
   onRefresh,
   refreshing,
 }: CurrentWeatherProps) {
-  const { current, daily, hourly, utcOffsetSeconds } = data;
+  const { current, daily, hourly, yesterday, utcOffsetSeconds } = data;
   const today = daily[0];
   const label = conditionLabel(current.weatherCode);
 
@@ -205,6 +263,7 @@ export function CurrentWeather({
             value={formatHour(today.sunrise, units)}
           />
         )}
+        <YesterdayChip today={today} yesterday={yesterday} units={units} />
       </div>
 
       <p className="text-on-scene-3 tnum mt-5 text-[12px]">

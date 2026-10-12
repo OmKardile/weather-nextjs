@@ -14,6 +14,52 @@ import type { City, Units } from '@/types/weather';
 
 const MAX_SAVED_CITIES = 8;
 
+/**
+ * Normalize a persisted city object.
+ *
+ * localStorage is untrusted input: an older app version, a hand-edited value
+ * or a partially-written entry can produce a City-shaped object without
+ * finite coordinates. Downstream that meant MapLibre's `new LngLat(NaN, NaN)`
+ * crash (whole app) and weather requests silently anchored to (0, 0).
+ * The canonical shape is latitude/longitude; `lat`/`lon` are accepted as
+ * aliases so older/hand-made entries keep working instead of being dropped.
+ */
+function normalizeCity(value: unknown): City | null {
+  if (typeof value !== 'object' || value === null) return null;
+  const raw = value as Record<string, unknown>;
+  const pickNumber = (keys: string[]): number | null => {
+    for (const key of keys) {
+      const n = raw[key];
+      if (typeof n === 'number' && Number.isFinite(n)) return n;
+      if (typeof n === 'string' && n.trim() !== '' && Number.isFinite(Number(n))) return Number(n);
+    }
+    return null;
+  };
+  const latitude = pickNumber(['latitude', 'lat']);
+  const longitude = pickNumber(['longitude', 'lon']);
+  const id = pickNumber(['id']);
+  const name = typeof raw.name === 'string' ? raw.name.trim() : '';
+  if (latitude === null || longitude === null || id === null || name === '') return null;
+  const city: City = {
+    ...(raw as { admin1?: string; country?: string; countryCode?: string; timezone?: string; source?: 'search' | 'location' }),
+    id,
+    name,
+    country: typeof raw.country === 'string' ? raw.country : '',
+    latitude,
+    longitude,
+  };
+  return city;
+}
+
+/** Filter + normalize a persisted saved-cities array (drops unrecoverable rows). */
+function normalizeCities(value: unknown): City[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((entry) => normalizeCity(entry))
+    .filter((city): city is City => city !== null)
+    .slice(0, MAX_SAVED_CITIES);
+}
+
 /** Daily-forecast horizon: 7 days by default, 16 when the user opts in. */
 export type ForecastDays = 7 | 16;
 
@@ -42,6 +88,8 @@ interface PreferencesState {
   glassTransparency: GlassTransparency;
   /** Reduce bright effects: no specular pointer highlight, no chromatic fringe. */
   reduceBrightEffects: boolean;
+  /** Device-tilt glass highlights (motion sensor, permission-gated on iOS). */
+  tiltGlowEnabled: boolean;
   savedCities: City[];
   lastCity: City | null;
   setUnits: (units: Units) => void;
@@ -56,6 +104,7 @@ interface PreferencesState {
   setDensity: (density: Density) => void;
   setGlassTransparency: (value: GlassTransparency) => void;
   setReduceBrightEffects: (enabled: boolean) => void;
+  setTiltGlowEnabled: (enabled: boolean) => void;
   saveCity: (city: City) => void;
   removeCity: (id: number) => void;
   /** Reorder saved cities (new full order, e.g. from a drag-and-drop list). */
@@ -82,6 +131,7 @@ export const usePreferences = create<PreferencesState>()(
       density: 'comfortable',
       glassTransparency: 0,
       reduceBrightEffects: false,
+      tiltGlowEnabled: false,
       savedCities: [],
       lastCity: null,
 
@@ -115,6 +165,8 @@ export const usePreferences = create<PreferencesState>()(
 
       setReduceBrightEffects: (enabled) => set({ reduceBrightEffects: enabled }),
 
+      setTiltGlowEnabled: (enabled) => set({ tiltGlowEnabled: enabled }),
+
       saveCity: (city) =>
         set((state) =>
           state.savedCities.some((saved) => saved.id === city.id)
@@ -146,10 +198,15 @@ export const usePreferences = create<PreferencesState>()(
         // v3 dropped `theme` + `accent` (the interface now themes itself
         // from the live sky; the aurora accent is the brand). Strip the
         // retired keys so re-persisted state stays clean.
-        const { theme: _theme, accent: _accent, ...rest } =
+        const { theme: _theme, accent: _accent, savedCities: _saved, lastCity: _last, ...rest } =
           (persisted as Record<string, unknown> | undefined) ?? {};
         return rest as Partial<PreferencesState>;
       })()),
+      // Cities are untrusted localStorage payloads — normalize coordinates
+      // (lat/lon aliases coerced, invalid entries dropped) so MapLibre and
+      // the weather query never see undefined/NaN.
+      savedCities: normalizeCities((persisted as { savedCities?: unknown } | undefined)?.savedCities),
+      lastCity: normalizeCity((persisted as { lastCity?: unknown } | undefined)?.lastCity),
       // New fields keep their defaults when upgrading from older persisted state.
       aiVoice: AI_VOICE_IDS.includes((persisted as { aiVoice?: AiVoiceId } | undefined)?.aiVoice as AiVoiceId)
         ? ((persisted as { aiVoice?: AiVoiceId }).aiVoice as AiVoiceId)
@@ -179,6 +236,8 @@ export const usePreferences = create<PreferencesState>()(
       })(),
       reduceBrightEffects:
         (persisted as { reduceBrightEffects?: boolean } | undefined)?.reduceBrightEffects === true,
+      tiltGlowEnabled:
+        (persisted as { tiltGlowEnabled?: boolean } | undefined)?.tiltGlowEnabled === true,
     }) },
   ),
 );

@@ -73,8 +73,10 @@ export function MobileDock({ active, onChange, className }: MobileDockProps) {
                   size={20}
                   animated
                   className={cn(
-                    'relative transition-colors duration-200',
-                    isActive ? 'text-white' : 'text-white/72 group-hover:text-white',
+                    'relative transition-all duration-200 ease-[var(--ease-spring-bouncy)]',
+                    isActive
+                      ? 'scale-110 text-white drop-shadow-[0_0_10px_rgb(255_255_255/0.45)]'
+                      : 'text-white/72 group-hover:text-white',
                   )}
                 />
                 <span
