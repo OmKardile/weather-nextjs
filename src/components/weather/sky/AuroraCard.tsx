@@ -187,7 +187,7 @@ function KpSparkline({ series, units }: { series: SpaceWeather['series']; units:
           strokeWidth={1.5}
         />
           </svg>
-          <div className="tnum mt-0.5 flex justify-between text-[10px] text-surface-faint">
+          <div className="tnum mt-0.5 flex justify-between text-[10px] text-surface-muted">
             <span>
               {format(
                 parseISO(first.time),

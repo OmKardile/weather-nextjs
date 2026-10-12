@@ -94,17 +94,32 @@ export function MarineCard({ city, units }: MarineCardProps) {
           <circle cx="36" cy="36" r="3" style={{ fill: 'var(--surface-strong)' }} stroke="#45D1B3" strokeWidth="1.5" />
         </svg>
 
-        <div className="min-w-0">
-          <p className="tnum text-xl font-semibold text-surface">
+        <div className="min-w-0 flex-1">
+          <p className="tnum text-xl font-semibold leading-tight text-surface">
             {formatWaveHeight(today.waveHeightMax ?? 0, units)}
           </p>
-          <p className="tnum text-xs text-surface-muted">
-            {direction != null ? `from ${compassPoint(direction)}` : 'Direction unavailable'}
-            {period != null ? ` · ${period.toFixed(0)} s period` : ''}
+          <p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 text-xs leading-snug text-surface-muted">
+            {direction != null ? (
+              <span className="tnum whitespace-nowrap">from {compassPoint(direction)}</span>
+            ) : (
+              <span>Direction unavailable</span>
+            )}
+            {period != null && (
+              <>
+                <span aria-hidden="true" className="text-surface-faint">·</span>
+                <span className="tnum whitespace-nowrap">{period.toFixed(0)} s period</span>
+              </>
+            )}
           </p>
-          <p className="tnum text-xs text-surface-faint">
-            Peak this week {formatWaveHeight(weeklyPeak.waveHeightMax ?? 0, units)} ·{' '}
-            {formatWeekday(weeklyPeak.date) || weeklyPeak.date.slice(5)}
+          <p className="mt-2 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5 border-t border-[var(--surface-border)] pt-1.5 text-xs leading-snug text-surface-faint">
+            <span className="whitespace-nowrap">Peak this week</span>
+            <span className="tnum font-medium text-surface-muted whitespace-nowrap">
+              {formatWaveHeight(weeklyPeak.waveHeightMax ?? 0, units)}
+            </span>
+            <span aria-hidden="true">·</span>
+            <span className="tnum whitespace-nowrap">
+              {formatWeekday(weeklyPeak.date) || weeklyPeak.date.slice(5)}
+            </span>
           </p>
         </div>
       </div>

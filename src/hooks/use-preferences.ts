@@ -49,6 +49,8 @@ interface PreferencesState {
   setDensity: (density: Density) => void;
   saveCity: (city: City) => void;
   removeCity: (id: number) => void;
+  /** Reorder saved cities (new full order, e.g. from a drag-and-drop list). */
+  reorderCities: (cities: City[]) => void;
   isSaved: (id: number) => boolean;
   setLastCity: (city: City | null) => void;
 }
@@ -106,6 +108,17 @@ export const usePreferences = create<PreferencesState>()(
 
       removeCity: (id) =>
         set((state) => ({ savedCities: state.savedCities.filter((city) => city.id !== id) })),
+
+      reorderCities: (cities) =>
+        set((state) => {
+          // Trust the input order only if it is a permutation of the current
+          // saved set — never add or drop cities through the reorder path.
+          const currentIds = new Set(state.savedCities.map((city) => city.id));
+          const nextIds = new Set(cities.map((city) => city.id));
+          if (currentIds.size !== nextIds.size) return state;
+          for (const id of currentIds) if (!nextIds.has(id)) return state;
+          return { savedCities: cities };
+        }),
 
       isSaved: (id) => get().savedCities.some((city) => city.id === id),
 

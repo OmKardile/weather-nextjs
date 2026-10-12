@@ -68,7 +68,8 @@ export type UiIconName =
   | 'satellite'
   | 'volume'
   | 'grip'
-  | 'share';
+  | 'share'
+  | 'compare';
 
 export type IconName = WeatherIconName | UiIconName;
 
@@ -902,6 +903,13 @@ const UI_GLYPHS: Record<UiIconName, (args: { id: string; sw: number }) => ReactN
       <circle cx="17.2" cy="5.8" r="2.5" />
       <circle cx="17.2" cy="18.2" r="2.5" />
       <path d="M8.6 10.9l6.4-3.9M8.6 13.1l6.4 3.9" />
+    </g>
+  ),
+  compare: ({ sw }) => (
+    <g {...strokeProps(sw)}>
+      {/* two opposing arrows — side-by-side comparison */}
+      <path d="M3.5 8.5h14M14.5 5.5l3 3-3 3" />
+      <path d="M20.5 15.5h-14M9.5 12.5l-3 3 3 3" />
     </g>
   ),
 };

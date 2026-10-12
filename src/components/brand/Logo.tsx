@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useId, type ReactElement } from 'react';
 import { cn } from '@/lib/utils';
 
 interface LogoMarkProps {
@@ -38,7 +38,7 @@ export const LOGO_MARK_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0
   <path d="M20.5 40.5 q3.2 -3.4 6.4 0 t6.4 0 t6.4 0 t6.4 0" fill="none" stroke="#F4FFFB" stroke-width="4" stroke-linecap="round" opacity="0.92"/>
 </svg>`;
 
-export function LogoMark({ className }: LogoMarkProps): JSX.Element {
+export function LogoMark({ className }: LogoMarkProps): ReactElement {
   // Namespaced gradient ids — the mark can appear twice on a page (menu bar +
   // footer) without duplicate DOM ids.
   const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
@@ -98,7 +98,7 @@ interface LogoProps {
   withWordmark?: boolean;
 }
 
-export function Logo({ className, withWordmark = true }: LogoProps): JSX.Element {
+export function Logo({ className, withWordmark = true }: LogoProps): ReactElement {
   return (
     <span className={cn('inline-flex items-center gap-2.5', className)}>
       <LogoMark />

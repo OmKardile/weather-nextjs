@@ -67,7 +67,7 @@ function ActivityCard({ activity }: { activity: ActivityScore }): JSX.Element {
           style={{ width: `${Math.max(activity.score, 3)}%` }}
         />
       </div>
-      <p className="mt-2.5 line-clamp-2 text-xs leading-relaxed text-surface-muted">{activity.reason}</p>
+      <p className="mt-3 line-clamp-3 min-h-[3.4rem] text-xs leading-relaxed text-surface-muted">{activity.reason}</p>
     </Glass>
   );
 }

@@ -162,11 +162,11 @@ export function CitiesSidebar({
       <div className="scroll-slim flex-1 space-y-1.5 overflow-y-auto px-3 pb-3">
         {cities.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-[var(--surface-border)] p-4 text-center">
-            <p className="text-xs leading-relaxed text-surface-faint">
+            <p className="text-xs leading-relaxed text-surface-muted">
               No saved cities yet.
               <br />
               Press{' '}
-              <kbd className="rounded-md border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-1.5 py-0.5 text-[10px] font-medium text-surface-muted">
+              <kbd className="mx-0.5 inline-block rounded-md border border-[var(--surface-border)] bg-[var(--surface-subtle)] px-1.5 py-0.5 text-[10px] font-medium text-surface">
                 ⌘K
               </kbd>{' '}
               to search the world.
