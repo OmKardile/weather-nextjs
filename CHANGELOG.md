@@ -5,6 +5,64 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] — 2026-10-12
+
+Liquid Glass material overhaul — a full pass over the glass system driven
+by a browser-audited QA round (pixel sampling + vision review at 390/1440,
+dark/light scenes, slider 0/50/100). The headline fix: **dark-scene cards
+no longer read as milky grey slabs**. iOS dark materials *darken* the
+scene behind them; tinting them white produced exactly the frosted
+glassmorphism look this project set out to replace.
+
+### Changed
+- **Dark-scene Surface tint is now dark-teal translucent** (`.16 → .74`
+  with the slider, `--surface-dark-a`) plus a 5 % white whisper, instead
+  of a white `.08–.14` fill. Pixel-verified: card interiors now match the
+  scene beside them (clear glass), while light scenes keep the correct
+  milky-white material.
+- **Refraction is visible again** — displacement base scale 10 → 12.5 px
+  (relative 1.00/1.05/1.10) so the rim lensing and chromatic fringe
+  survive blur(2px); the opposing-corner rim brightened (.6 → .7 TL/BR,
+  complete faint .1 ring elsewhere).
+- **Selected capsules read as lit glass, not grey pills** — `.lg-selected`
+  drops to a .13 white fill with a stronger top hairline and inner glow.
+- **Segmented controls inside cards are flat inset wells** (`.segment-well`)
+  with the morphing selected capsule on top — a nested `<LiquidGlass>`
+  there was glass-on-glass and burned a live backdrop-filter per control.
+- **Cards inside sheets/modals never re-blur** (`.surface-overlay …`
+  context rule) — the sheet already frosted the scene; this also removes
+  per-card blur cost while the forecast drawer drags.
+- **Hero actions (share / save / refresh) are ghost controls**
+  (`.hero-ghost`) — quiet white icons on the scene, hairline + fill only
+  on hover/press. Zero chrome in the hero, like Apple Weather.
+- **Mobile drawer peek detent 0.22 → 0.34** — the first card's title now
+  always clears the floating dock (the old peek hid "Next 48 hours"
+  behind the capsule; verified by rect measurement + vision audit).
+- **Light-scene hero scrim deepened** (.44 → .52 top) for AA margin on
+  secondary white text over pale skies.
+- **`prefers-reduced-transparency` now has solid fallbacks for every
+  material tier** (controls, cards, overlays — dark teal / off-white),
+  not just the control layer; previously cards lost their blur but kept
+  a .08 white tint and went see-through.
+
+### Fixed
+- **Refraction filter cache ignored strength** — the cache key was
+  `(w, h, radius)`, so moving the transparency slider silently kept the
+  old baked feDisplacementMap scales. Strength is now part of the key;
+  the slider visibly bends the light again.
+- **Live backdrop-filter budget** — 8 elements were live on the mobile
+  viewport (budget ≤ 6). Now 6 mobile / 4 desktop (browser-audited):
+  hero stat chips are flat `.surface-chip` fills, the segment well is
+  flat, and overlay inner cards don't re-blur.
+- **Glass-on-glass in the AI panels** — the Ask AI / Planner header,
+  composer and footer strips were `.glass` (backdrop blur) *inside* the
+  `.glass-strong` panel; they are now flat `.surface-inset` strips.
+- **SiteFooter was a full-width glass slab** — the "solid white footer
+  panel" at the bottom of the page. It is now flat text on the scene
+  with a whisper hairline.
+- Removed the dead legacy `TopBar.tsx` (solid-bar implementation that
+  predated the floating-capsule MenuBar).
+
 ## [3.6.0] — 2026-10-12
 
 Climate lens round: the Time machine grows a **30-year climate trend**

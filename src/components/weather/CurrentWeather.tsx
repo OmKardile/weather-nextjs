@@ -16,7 +16,6 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { WeatherIcon } from '@/components/weather/WeatherIcon';
 import { ShareCardButton } from '@/components/weather/ShareCardButton';
-import { LiquidGlass } from '@/components/glass/LiquidGlass';
 import { useAchievements } from '@/hooks/use-achievements';
 import { useCountUp } from '@/hooks/use-count-up';
 import { streakFromDays } from '@/lib/achievements';
@@ -67,7 +66,7 @@ function StatChip({
   iconClassName?: string;
 }) {
   return (
-    <div className="surface rounded-full px-3.5 py-2 transition-transform duration-200 ease-[var(--ease-spring-bouncy)] active:scale-95">
+    <div className="surface-chip rounded-full px-3.5 py-2 transition-transform duration-200 ease-[var(--ease-spring-bouncy)] active:scale-95">
       <p className="flex items-center gap-2 text-[13px] leading-none text-surface">
         <span className={iconClassName ?? 'text-surface-muted'} aria-hidden="true">
           {icon}
@@ -200,37 +199,38 @@ export function CurrentWeather({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <ShareCardButton city={city} data={data} units={units} />
-          <LiquidGlass
-            as="button"
+          {/* Ghost controls — flat on the scene (Apple Weather composes the
+              hero with zero chrome; glass is reserved for floating chrome
+              that needs the backdrop-filter budget). */}
+          <button
             type="button"
             onClick={onToggleSave}
             aria-pressed={isSaved}
             aria-label={isSaved ? `Remove ${city.name} from saved cities` : `Save ${city.name} to saved cities`}
             title={isSaved ? 'Remove from saved' : 'Save city'}
-            className="focus-ring flex h-11 w-11 items-center justify-center rounded-full"
+            className="hero-ghost focus-ring flex h-11 w-11 items-center justify-center rounded-full"
           >
             {isSaved ? (
               <BookmarkCheck className="h-5 w-5" aria-hidden="true" />
             ) : (
               <Bookmark className="h-5 w-5" aria-hidden="true" />
             )}
-          </LiquidGlass>
-          <LiquidGlass
-            as="button"
+          </button>
+          <button
             type="button"
             onClick={onRefresh}
             disabled={refreshing}
             aria-label="Refresh weather data"
             title="Refresh"
-            className="focus-ring flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-60"
+            className="hero-ghost focus-ring flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-60"
           >
             <RefreshCw
               className={cn('h-5 w-5', refreshing && 'animate-spin')}
               aria-hidden="true"
             />
-          </LiquidGlass>
+          </button>
         </div>
       </div>
 

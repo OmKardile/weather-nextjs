@@ -72,7 +72,8 @@
 }
 
 /* (c) rim light — 1px opposing-corner gradient ring: bright top-left
-   + bottom-right (~.6), faint on the other two corners (~.08). */
+   + bottom-right (~.7), faint but complete on the other two corners
+   (~.1) so the lens edge always reads against dark scenes. */
 .lg::before {
   content: '';
   position: absolute;
@@ -81,10 +82,10 @@
   padding: 1px;
   background: linear-gradient(
     135deg,
-    rgb(255 255 255 / calc(0.6 * var(--lg-rim, 1) * var(--lg-rim-c, 1))) 0%,
-    rgb(255 255 255 / calc(0.08 * var(--lg-rim, 1) * var(--lg-rim-c, 1))) 24%,
-    rgb(255 255 255 / calc(0.08 * var(--lg-rim, 1) * var(--lg-rim-c, 1))) 76%,
-    rgb(255 255 255 / calc(0.6 * var(--lg-rim, 1) * var(--lg-rim-c, 1))) 100%
+    rgb(255 255 255 / calc(0.7 * var(--lg-rim, 1) * var(--lg-rim-c, 1))) 0%,
+    rgb(255 255 255 / calc(0.1 * var(--lg-rim, 1) * var(--lg-rim-c, 1))) 24%,
+    rgb(255 255 255 / calc(0.1 * var(--lg-rim, 1) * var(--lg-rim-c, 1))) 76%,
+    rgb(255 255 255 / calc(0.7 * var(--lg-rim, 1) * var(--lg-rim-c, 1))) 100%
   );
   -webkit-mask:
     linear-gradient(#fff 0 0) content-box,
@@ -184,13 +185,17 @@
 }
 
 /* Selected segment — inner lighter glass capsule (no backdrop-filter:
-   sits inside the parent LiquidGlass, never glass-on-glass). */
+   sits inside the parent LiquidGlass, never glass-on-glass). Lit-glass
+   look: modest white fill + a strong top hairline, never a grey pill. */
 .lg-selected {
-  background: rgb(255 255 255 / 0.18);
+  background:
+    linear-gradient(rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.1)),
+    rgb(255 255 255 / 0.13);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.4),
-    inset 0 0 0 0.5px rgb(255 255 255 / 0.18),
-    0 1px 4px rgb(0 0 0 / 0.18);
+    inset 0 1px 0 rgb(255 255 255 / 0.5),
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.22),
+    inset 0 0 12px rgb(255 255 255 / 0.06),
+    0 1px 4px rgb(0 0 0 / 0.2);
 }
 
 [data-surface='light'] .lg-selected {
@@ -205,11 +210,14 @@
 /* CONTENT LAYER — flat Surface material                                */
 /* ================================================================== */
 
-/* Workhorse cards: blur(22px) saturate(1.4), light tint, hairline,
-   soft shadow. Flatter than .lg on purpose. */
+/* Workhorse cards: blur(22px) saturate(1.4), hairline, soft shadow —
+   flatter than .lg on purpose. On DARK scenes the tint is DARK-teal
+   translucent with a whisper of white (iOS dark materials darken the
+   scene; a white tint here is what reads as a milky grey slab). */
 .surface,
 .glass {
-  background-color: rgb(255 255 255 / var(--surface-tint-a, 0.1));
+  background-color: rgb(10 28 30 / var(--surface-dark-a, 0.16));
+  background-image: linear-gradient(rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.05));
   -webkit-backdrop-filter: blur(22px) saturate(1.4);
   backdrop-filter: blur(22px) saturate(1.4);
   border: 1px solid rgb(255 255 255 / 0.12);
@@ -219,27 +227,75 @@
 /* Raised surface — one feature surface per view (AI briefing card). */
 .surface-strong,
 .glass-strong {
-  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.03));
+  background-color: rgb(10 28 30 / calc(var(--surface-dark-a, 0.16) + 0.05));
+  background-image: linear-gradient(rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.06));
   -webkit-backdrop-filter: blur(26px) saturate(1.45);
   backdrop-filter: blur(26px) saturate(1.45);
   border: 1px solid rgb(255 255 255 / 0.14);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
     0 10px 30px rgb(0 0 0 / 0.16);
 }
 
 /* Subtle — chips, pills, inline controls. PLAIN FILL (no backdrop
-   filter): these sit on top of cards and inside scrolling rows. */
+   filter): these sit on top of cards and inside scrolling rows. Dark
+   fill + white hairline = dark glass chip, never a grey milk pill. */
 .surface-subtle,
 .glass-subtle {
-  background-color: rgb(255 255 255 / 0.08);
+  background-color: rgb(7 22 24 / 0.34);
   border: 1px solid rgb(255 255 255 / 0.1);
+}
+
+/* Chip — small standalone chips on the SCENE (hero quick stats).
+   Flat by design: no backdrop-filter (perf budget ≤6 live), a dark
+   translucent fill that keeps the scene visible, hairline + tiny
+   shadow for lift. */
+.surface-chip {
+  background-color: rgb(7 22 24 / 0.3);
+  background-image: linear-gradient(rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.05));
+  border: 1px solid rgb(255 255 255 / 0.12);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.16);
+}
+
+[data-surface='light'] .surface-chip {
+  background-color: rgb(255 255 255 / 0.4);
+  background-image: linear-gradient(rgb(0 0 0 / 0.02), rgb(0 0 0 / 0.02));
+  border: 1px solid rgb(14 42 46 / 0.12);
+  box-shadow: 0 2px 10px rgb(66 92 88 / 0.14);
+}
+
+/* Inset region — a flat strip INSIDE a Surface panel (AI panel header,
+   composer, footer). Slightly lighter than the panel body, never any
+   backdrop-filter (that would stack translucent layers — glass-on-glass). */
+.surface-inset {
+  background-color: rgb(255 255 255 / 0.05);
+}
+
+[data-surface='light'] .surface-inset {
+  background-color: rgb(255 255 255 / 0.42);
+}
+
+/* Segment well — segmented control nested INSIDE a Surface card (iOS
+   inset-well treatment). Flat: no backdrop-filter (keeps the ≤6 live
+   budget and never stacks a third translucent layer). The morphing
+   .lg-selected capsule rides on top as the only "lit" element. */
+.segment-well {
+  background-color: rgb(4 16 18 / 0.35);
+  border: 1px solid rgb(255 255 255 / 0.06);
+  box-shadow: inset 0 1px 2px rgb(0 0 0 / 0.22);
+}
+
+[data-surface='light'] .segment-well {
+  background-color: rgb(14 42 46 / 0.1);
+  border: 1px solid rgb(14 42 46 / 0.08);
+  box-shadow: inset 0 1px 2px rgb(14 42 46 / 0.12);
 }
 
 /* Overlay — modals / sheets (settings, command palette): content
    surfaces that must be highly legible. Still flat. */
 .surface-overlay {
-  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.16));
+  background-color: rgb(10 28 30 / calc(var(--surface-dark-a, 0.16) + 0.3));
+  background-image: linear-gradient(rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.05));
   -webkit-backdrop-filter: blur(30px) saturate(1.5);
   backdrop-filter: blur(30px) saturate(1.5);
   border: 1px solid rgb(255 255 255 / 0.14);
@@ -247,6 +303,31 @@
     inset 0 1px 0 rgb(255 255 255 / 0.14),
     0 24px 64px -12px rgb(0 0 0 / 0.5),
     0 4px 12px rgb(0 0 0 / 0.2);
+}
+
+/* Cards INSIDE an overlay/sheet never re-blur — the sheet already
+   frosted the scene; a nested backdrop-filter would stack translucent
+   layers (never more than 2) and burn one live filter per card while
+   the sheet drags. Inner cards become flat fills + hairline. */
+.surface-overlay .surface,
+.surface-overlay .glass,
+.surface-overlay .glass-strong,
+.surface-overlay .glass-2-base,
+.surface-overlay .glass-2-raised {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background-color: rgb(255 255 255 / 0.05);
+  background-image: none;
+}
+
+[data-surface='light'] .surface-overlay .surface,
+[data-surface='light'] .surface-overlay .glass,
+[data-surface='light'] .surface-overlay .glass-strong,
+[data-surface='light'] .surface-overlay .glass-2-base,
+[data-surface='light'] .surface-overlay .glass-2-raised {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background-color: rgb(255 255 255 / 0.32);
 }
 
 /* Light scenes: milkier white + faint dark undertone + ink hairline. */
@@ -270,6 +351,26 @@
 [data-surface='light'] .glass-subtle {
   background-color: rgb(255 255 255 / 0.42);
   border: 1px solid rgb(14 42 46 / 0.1);
+}
+
+/* Dark-scene hover for the flat fills stays in the dark family. */
+.surface-subtle,
+.glass-subtle {
+  transition:
+    background-color 250ms var(--ease-soft, ease),
+    border-color 250ms var(--ease-soft, ease);
+}
+
+.surface-subtle:hover,
+.glass-subtle:hover {
+  background-color: rgb(12 34 36 / 0.44);
+  border-color: rgb(255 255 255 / 0.16);
+}
+
+[data-surface='light'] .surface-subtle:hover,
+[data-surface='light'] .glass-subtle:hover {
+  background-color: rgb(255 255 255 / 0.52);
+  border-color: rgb(14 42 46 / 0.16);
 }
 
 [data-surface='light'] .surface-overlay {
@@ -346,7 +447,8 @@
 .glass-2-base {
   /* identical to .surface (kept as a separate class so <Glass> can
      evolve independently of raw .glass usages) */
-  background-color: rgb(255 255 255 / var(--surface-tint-a, 0.1));
+  background-color: rgb(10 28 30 / var(--surface-dark-a, 0.16));
+  background-image: linear-gradient(rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.05));
   -webkit-backdrop-filter: blur(22px) saturate(1.4);
   backdrop-filter: blur(22px) saturate(1.4);
   border: 1px solid rgb(255 255 255 / 0.12);
@@ -354,17 +456,19 @@
 }
 
 .glass-2-raised {
-  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.03));
+  background-color: rgb(10 28 30 / calc(var(--surface-dark-a, 0.16) + 0.05));
+  background-image: linear-gradient(rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.06));
   -webkit-backdrop-filter: blur(26px) saturate(1.45);
   backdrop-filter: blur(26px) saturate(1.45);
   border: 1px solid rgb(255 255 255 / 0.14);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    inset 0 1px 0 rgb(255 255 255 / 0.12),
     0 10px 30px rgb(0 0 0 / 0.16);
 }
 
 .glass-2-overlay {
-  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.16));
+  background-color: rgb(10 28 30 / calc(var(--surface-dark-a, 0.16) + 0.3));
+  background-image: linear-gradient(rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.05));
   -webkit-backdrop-filter: blur(30px) saturate(1.5);
   backdrop-filter: blur(30px) saturate(1.5);
   border: 1px solid rgb(255 255 255 / 0.14);
@@ -417,6 +521,43 @@
   text-shadow: 0 1px 12px rgb(0 0 0 / 0.14);
 }
 
+/* Ghost control — hero-row buttons (share / save / refresh) that sit
+   directly on the scene over UNSCROLLED content. No glass: they keep
+   the ≤6 backdrop-filter budget for real floating chrome, and the hero
+   stays composed like Apple Weather (no chrome until you scroll).
+   Hairline + fill only appear on hover/press. */
+.hero-ghost {
+  color: rgb(255 255 255 / 0.78);
+  background: transparent;
+  border: 1px solid transparent;
+  transition:
+    background-color 220ms var(--ease-soft, ease),
+    border-color 220ms var(--ease-soft, ease),
+    color 220ms var(--ease-soft, ease),
+    transform 380ms var(--ease-spring-bouncy, cubic-bezier(0.34, 1.56, 0.64, 1));
+}
+
+.hero-ghost:hover {
+  background-color: rgb(255 255 255 / 0.1);
+  border-color: rgb(255 255 255 / 0.16);
+  color: rgb(255 255 255 / 1);
+}
+
+.hero-ghost:active {
+  transform: scale(0.94);
+  background-color: rgb(255 255 255 / 0.14);
+}
+
+.hero-ghost:disabled {
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-ghost:active {
+    transform: none;
+  }
+}
+
 /* Scene-aware hero scrim — sits over the scene canvas, under the hero
    text. Light scenes get a deeper top gradient so white text passes
    AA (Apple Weather approach: darken the sky, keep the text white). */
@@ -435,10 +576,10 @@
 [data-surface='light'] .hero-scrim {
   background: linear-gradient(
     to bottom,
-    rgb(6 24 26 / 0.44),
-    rgb(6 24 26 / 0.22) 26%,
-    rgb(6 24 26 / 0.04) 52%,
-    transparent 68%
+    rgb(6 24 26 / 0.52),
+    rgb(6 24 26 / 0.3) 30%,
+    rgb(6 24 26 / 0.08) 58%,
+    transparent 74%
   );
 }
 
@@ -537,15 +678,42 @@
   .surface-overlay {
     -webkit-backdrop-filter: none;
     backdrop-filter: none;
+    background-image: none;
   }
 
   .lg {
     background-color: rgb(16 38 40 / 0.92);
   }
 
+  .surface,
+  .glass,
+  .glass-2-base {
+    background-color: rgb(12 30 32 / 0.94);
+  }
+
+  .glass-strong,
+  .glass-2-raised {
+    background-color: rgb(14 32 34 / 0.96);
+  }
+
+  .surface-overlay,
+  .glass-2-overlay {
+    background-color: rgb(10 26 28 / 0.98);
+  }
+
   [data-surface='light'] .lg {
     background-color: rgb(240 248 245 / 0.96);
     color: #0e2a2e;
+  }
+
+  [data-surface='light'] .surface,
+  [data-surface='light'] .glass,
+  [data-surface='light'] .glass-2-base,
+  [data-surface='light'] .glass-strong,
+  [data-surface='light'] .glass-2-raised,
+  [data-surface='light'] .surface-overlay,
+  [data-surface='light'] .glass-2-overlay {
+    background-color: rgb(240 248 245 / 0.97);
   }
 
   .lg::before {

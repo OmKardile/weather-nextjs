@@ -157,7 +157,7 @@ export function AskAIPanel({ city, units, bundle, className, onClose }: AskAIPan
   return (
     <div className={cn('flex h-full min-h-0 flex-col', className)}>
       {/* Header */}
-      <header className="glass border-x-0 border-t-0 border-b border-surface px-4 pb-3 pt-4">
+      <header className="surface-inset border-x-0 border-t-0 border-b border-surface px-4 pb-3 pt-4">
         <div className="flex items-center gap-2">
           <Icon name="sparkle" size={15} className="shrink-0 text-aurora-500" />
           <h2 className="font-display text-sm font-semibold text-surface">Ask Aether</h2>
@@ -278,7 +278,7 @@ export function AskAIPanel({ city, units, bundle, className, onClose }: AskAIPan
       </div>
 
       {/* Composer */}
-      <div className="glass border-x-0 border-b-0 border-t border-surface px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+      <div className="surface-inset border-x-0 border-b-0 border-t border-surface px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
         <form
           onSubmit={(event) => {
             event.preventDefault();

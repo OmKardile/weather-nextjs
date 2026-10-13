@@ -202,7 +202,7 @@ export function PlannerPanel({ city, units, voice, className }: PlannerPanelProp
   return (
     <div className={cn('flex h-full min-h-0 flex-col', className)}>
       {/* Plan composer */}
-      <div className="glass border-x-0 border-b border-t-0 border-surface px-4 pb-3 pt-4">
+      <div className="surface-inset border-x-0 border-b border-t-0 border-surface px-4 pb-3 pt-4">
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -295,7 +295,7 @@ export function PlannerPanel({ city, units, voice, className }: PlannerPanelProp
       </div>
 
       {/* Footer — provider badge + disclaimer */}
-      <div className="glass flex items-center justify-between gap-2 border-x-0 border-b-0 border-t border-surface px-4 py-2.5">
+      <div className="surface-inset flex items-center justify-between gap-2 border-x-0 border-b-0 border-t border-surface px-4 py-2.5">
         <p className="text-[10px] leading-relaxed text-surface-faint">
           Windows are AI suggestions — double-check before you commit.
         </p>

@@ -115,8 +115,13 @@ export function useLiquidGlassVars(): CSSProperties {
     '--lg-blur': `${(2 + t * 26).toFixed(1)}px`,
     '--lg-refract': (1 - t * 0.75).toFixed(3),
     '--lg-rim': (1 - t * 0.65).toFixed(3),
-    // Surface (content layer) — flatter, follows the same slider
+    // Surface (content layer) — flatter, follows the same slider.
+    // Dark scenes tint DARK-teal translucent (.16 → .74): iOS dark
+    // materials darken the scene behind cards; a white tint here is
+    // exactly the "milky grey slab" look. Light scenes keep white milk
+    // via --surface-tint-a ([data-surface='light'] variants).
     '--surface-tint-a': (0.08 + t * 0.32).toFixed(3),
+    '--surface-dark-a': (0.16 + t * 0.58).toFixed(3),
   } as CSSProperties;
 }
 
@@ -200,7 +205,8 @@ export function LiquidGlass({
       handle?.release();
       releaseRefractionSlot(slot);
     };
-    // transparency changes regenerate through strength — cheap (cached)
+    // transparency changes bake a new strength into the filter — the
+    // cache key includes it, so the slider visibly bends the light
   }, [refractionEnabled, transparency]);
 
   const Component = as as ElementType;

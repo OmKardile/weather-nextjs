@@ -14,7 +14,12 @@ import { LiquidGlass } from '@/components/glass/LiquidGlass';
 /* (24) so nothing is ever clipped or overlapped by the floating dock.*/
 /* ================================================================== */
 
-export const DRAWER_SNAPS = [0.22, 0.58, 0.94] as const;
+/* Detents peek / half / full. The peek (0.34) clears the floating dock
+   (64px capsule + 12px bottom offset + scrim) so the first card's title
+   row and opening rows are fully readable ABOVE the dock — cards only
+   pass under the dock once the user scrolls, exactly like iOS Weather.
+   (0.22 hid the first card behind the capsule — "half-hidden text".) */
+export const DRAWER_SNAPS = [0.34, 0.62, 0.94] as const;
 export type DrawerSnap = (typeof DRAWER_SNAPS)[number];
 
 interface ForecastDrawerProps {

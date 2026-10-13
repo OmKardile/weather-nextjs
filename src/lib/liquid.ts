@@ -169,7 +169,10 @@ export function acquireRefractionFilter(
   strength: number,
 ): RefractionFilterHandle | null {
   if (typeof document === 'undefined') return null;
-  const key = `${Math.round(w)}x${Math.round(h)}r${Math.round(radius)}`;
+  // Strength is part of the cache key: the transparency slider changes
+  // it, and each strength needs its own baked feDisplacementMap scales
+  // (a plain (w,h,r) hit would silently keep the old refraction).
+  const key = `${Math.round(w)}x${Math.round(h)}r${Math.round(radius)}s${Math.round(strength * 20)}`;
   const cached = filterCache.get(key);
   if (cached) {
     cached.refcount += 1;
@@ -199,10 +202,10 @@ export function acquireRefractionFilter(
     <feColorMatrix in="map" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="mapR" />
     <feColorMatrix in="map" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="mapG" />
     <feColorMatrix in="map" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="mapB" />
-    <!-- Three displacement passes at slightly different scales (1.00 / 1.05 / 1.10) -->
-    <feDisplacementMap in="SourceGraphic" in2="mapR" scale="${scale(10)}" xChannelSelector="R" yChannelSelector="G" result="passR" />
-    <feDisplacementMap in="SourceGraphic" in2="mapG" scale="${scale(10.5)}" xChannelSelector="R" yChannelSelector="G" result="passG" />
-    <feDisplacementMap in="SourceGraphic" in2="mapB" scale="${scale(11)}" xChannelSelector="R" yChannelSelector="G" result="passB" />
+    <!-- Three displacement passes at slightly different scales (1.00 / 1.05 / 1.10 relatives on a 12.5px base) -->
+    <feDisplacementMap in="SourceGraphic" in2="mapR" scale="${scale(12.5)}" xChannelSelector="R" yChannelSelector="G" result="passR" />
+    <feDisplacementMap in="SourceGraphic" in2="mapG" scale="${scale(13.15)}" xChannelSelector="R" yChannelSelector="G" result="passG" />
+    <feDisplacementMap in="SourceGraphic" in2="mapB" scale="${scale(13.8)}" xChannelSelector="R" yChannelSelector="G" result="passB" />
     <!-- Recombine: screen-blend the passes → faint chromatic fringe at the rim -->
     <feBlend in="passR" in2="passG" mode="screen" result="combinedRG" />
     <feBlend in="combinedRG" in2="passB" mode="screen" result="combined" />

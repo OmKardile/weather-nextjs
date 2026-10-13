@@ -2,7 +2,6 @@
 
 import { useRef, useState } from 'react';
 import { LogoMark } from '@/components/brand/Logo';
-import { LiquidGlass } from '@/components/glass/LiquidGlass';
 import { Icon } from '@/components/icons/Icon';
 import { useToast } from '@/hooks/use-toast';
 import { getScene } from '@/lib/scenes';
@@ -281,21 +280,20 @@ export function ShareCardButton({ city, data, units }: ShareCardButtonProps) {
 
   return (
     <>
-      <LiquidGlass
-        as="button"
+      <button
         type="button"
         onClick={() => void handleShare()}
         disabled={busy}
         aria-label={`Share weather card for ${city.name}`}
         title="Share card"
-        className="focus-ring flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-60"
+        className="hero-ghost focus-ring flex h-11 w-11 items-center justify-center rounded-full disabled:opacity-60"
       >
         {busy ? (
           <Icon name="refresh" size={18} className="animate-spin" />
         ) : (
           <Icon name="share" size={18} />
         )}
-      </LiquidGlass>
+      </button>
       {/* Host for the live LogoMark — serialized to the canvas on share. */}
       <span ref={logoHostRef} aria-hidden="true" className="sr-only">
         <LogoMark />
