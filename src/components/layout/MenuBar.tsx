@@ -1,14 +1,13 @@
 'use client';
 
 import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useState, useSyncExternalStore } from 'react';
+import { useSyncExternalStore } from 'react';
 import { Logo } from '@/components/brand/Logo';
 import { Icon } from '@/components/icons/Icon';
 import { WeatherIcon } from '@/components/weather/WeatherIcon';
 import { LiquidGlass } from '@/components/glass/LiquidGlass';
 import { toggleAmbientSound } from '@/hooks/use-ambient-sound';
 import { usePreferences } from '@/hooks/use-preferences';
-import { formatLocalClock } from '@/lib/time';
 import { springs } from '@/lib/motion';
 import { formatTemp } from '@/lib/units';
 import { conditionLabel } from '@/lib/wmo';
@@ -101,17 +100,10 @@ export function MenuBar({
   onOpenSettings,
   onLocate,
 }: MenuBarProps) {
-  // Live local clock for the active city.
-  const [tick, setTick] = useState(0);
   // Hydration gate — the persisted ambient preference differs from the
   // server default, so the pressed state only applies after mount.
   const hydrated = useHydrated();
   const ambientEnabled = usePreferences((state) => state.ambientSoundEnabled);
-  useEffect(() => {
-    const timer = window.setInterval(() => setTick((v) => v + 1), 30_000);
-    return () => window.clearInterval(timer);
-  }, []);
-  const clock = bundle ? formatLocalClock(bundle.utcOffsetSeconds) : '';
 
   const showCompact = scrolled && bundle != null;
 
@@ -121,7 +113,10 @@ export function MenuBar({
         {/* Left — brand, floating free on the scene */}
         <Logo className="shrink-0 [&>span:last-child]:hidden sm:[&>span:last-child]:inline" />
 
-        {/* Center — city + time (or compact weather when scrolled) */}
+        {/* Center — compact weather summary while scrolled only. The resting
+            state is intentionally EMPTY: the hero right below already shows
+            the city name, local date and clock, so repeating them here was
+            double info at the top of the page. */}
         <div className="relative flex h-full min-w-0 flex-1 items-center justify-center">
           <AnimatePresence mode="popLayout" initial={false}>
             {!city ? (
@@ -157,26 +152,7 @@ export function MenuBar({
                   {conditionLabel(bundle.current.weatherCode)}
                 </span>
               </motion.div>
-            ) : (
-              <motion.div
-                key="clock"
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={springs.snappy}
-                className="text-on-scene flex min-w-0 items-center gap-2"
-              >
-                <span className="truncate text-[15px] font-semibold">{city.name}</span>
-                {clock && (
-                  <>
-                    <span aria-hidden="true" className="text-on-scene-3">
-                      ·
-                    </span>
-                    <span className="text-on-scene-2 tnum text-[14px]">{clock}</span>
-                  </>
-                )}
-              </motion.div>
-            )}
+            ) : null}
           </AnimatePresence>
         </div>
 

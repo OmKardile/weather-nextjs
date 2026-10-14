@@ -1,7 +1,7 @@
 'use client';
 
 import type { JSX } from 'react';
-import { differenceInMinutes, format, parseISO } from 'date-fns';
+import { differenceInMinutes, parseISO } from 'date-fns';
 import { Icon } from '@/components/icons/Icon';
 import { AURORA_400, AURORA_500, useMotionOk } from '@/components/weather/chart-helpers';
 import type { City, Units, WeatherBundle } from '@/types/weather';
@@ -58,15 +58,7 @@ function formatDelta(minutes: number): { text: string; gaining: boolean } {
   return { text: `${minutes >= 0 ? '+' : '−'}${label}`, gaining: minutes >= 0 };
 }
 
-function safeTime(iso: string, pattern: string): string {
-  try {
-    return format(parseISO(iso), pattern);
-  } catch {
-    return '—';
-  }
-}
-
-/* Semicircle gauge geometry (viewBox 220 × 122). */
+/** Semicircle gauge geometry (viewBox 220 × 122). */
 const CX = 110;
 const CY = 106;
 const R = 88;
@@ -119,8 +111,6 @@ export function DaylightCard({ city, bundle }: DaylightCardProps): JSX.Element |
   const fillAngle = 180 * (1 - progress); // 0° = right end (longest)
   const deltaChip = formatDelta(delta);
   const marker = polarToXY(fillAngle);
-  const sunriseLabel = safeTime(today.sunrise, 'HH:mm');
-  const sunsetLabel = safeTime(today.sunset, 'HH:mm');
 
   return (
     <div className="glass card-lift fs-card rounded-[var(--radius-card)] p-4 shadow-[var(--shadow-glass)] sm:p-5">
@@ -132,7 +122,7 @@ export function DaylightCard({ city, bundle }: DaylightCardProps): JSX.Element |
           <div className="min-w-0">
             <p className="text-sm font-semibold text-surface">Daylight</p>
             <p className="tnum mt-0.5 text-[11px] text-surface-faint">
-              {formatLength(todayLen)} of light today
+              {formatLength(todayLen)} of light · {formatLength(1440 - todayLen)} of night
             </p>
           </div>
         </div>
@@ -224,31 +214,10 @@ export function DaylightCard({ city, bundle }: DaylightCardProps): JSX.Element |
         </svg>
       </div>
 
-      <div className="mt-1 grid grid-cols-3 gap-2">
-        <div className="glass-subtle flex items-center gap-2 rounded-xl px-3 py-2">
-          <Icon name="sunrise" size={14} className="shrink-0 text-aurora-300" strokeWidth={2} />
-          <div className="min-w-0">
-            <p className="tnum text-xs font-semibold text-surface">{sunriseLabel}</p>
-            <p className="text-[10px] text-surface-muted">sunrise</p>
-          </div>
-        </div>
-        <div className="glass-subtle flex items-center gap-2 rounded-xl px-3 py-2">
-          <Icon name="sunset" size={14} className="shrink-0 text-aurora-300" strokeWidth={2} />
-          <div className="min-w-0">
-            <p className="tnum text-xs font-semibold text-surface">{sunsetLabel}</p>
-            <p className="text-[10px] text-surface-muted">sunset</p>
-          </div>
-        </div>
-        <div className="glass-subtle flex items-center gap-2 rounded-xl px-3 py-2">
-          <Icon name="moon" size={14} className="shrink-0 text-aurora-300" />
-          <div className="min-w-0">
-            <p className="tnum text-xs font-semibold text-surface">
-              {formatLength(1440 - todayLen)}
-            </p>
-            <p className="text-[10px] text-surface-muted">night</p>
-          </div>
-        </div>
-      </div>
+      {/* Sunrise/sunset times were removed here (v4.2 dedup): the hero
+          chip and the Sun path card in Details already show both times;
+          this card keeps what only it knows — night length, the daily
+          delta, the year gauge and the solstice countdown. */}
 
       <p className="mt-3 text-[10px] leading-relaxed text-surface-faint">
         {formatLength(remaining)} of daylight {toward === 'longest' ? 'still to gain' : 'still to lose'}{' '}

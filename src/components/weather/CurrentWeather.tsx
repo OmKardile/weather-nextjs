@@ -1,6 +1,6 @@
 'use client';
 
-import { format } from 'date-fns';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Bookmark,
   BookmarkCheck,
@@ -13,7 +13,6 @@ import {
   TrendingUp,
   Wind,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
 import { WeatherIcon } from '@/components/weather/WeatherIcon';
 import { ShareCardButton } from '@/components/weather/ShareCardButton';
 import { useAchievements } from '@/hooks/use-achievements';
@@ -164,13 +163,6 @@ export function CurrentWeather({
   );
 
   const precipChance = hourly[0]?.precipitationProbability ?? 0;
-  const updatedAt = (() => {
-    try {
-      return format(new Date(data.fetchedAt), units === 'metric' ? 'HH:mm' : 'h:mm a');
-    } catch {
-      return '';
-    }
-  })();
 
   const tempValue = displayTemp(current.temperature, units);
   // The giant readout counts to its new value (city switch, refresh) —
@@ -297,9 +289,10 @@ export function CurrentWeather({
         <StreakChip streak={streak} />
       </div>
 
-      <p className="text-on-scene-3 tnum mt-5 text-[12px]">
-        Updated {updatedAt} · data by Open-Meteo
-      </p>
+      {/* Data freshness + attribution live in ONE place: the FreshnessPill
+          on the hourly section header (relative, live-updating) and the
+          site footer (Open-Meteo credit). A static "Updated HH:mm" line
+          here repeated both. */}
     </section>
   );
 }

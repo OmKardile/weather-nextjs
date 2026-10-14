@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.0] — 2026-10-14
+
+De-duplication + readability round — "remove the things which are
+repeated in UI / increase the contrast and readability overall site".
+Every metric now has exactly ONE home; secondary text tiers were lifted
+until small 10–12px labels hold AA on both dark and light scenes
+(verified with vision audits + pixel reasoning at 390/1440).
+
+### Removed (duplication)
+- **Mobile Today tab rendered the official alerts card twice** — once in
+  the main column and again inside the forecast drawer. The drawer copy
+  is the survivor (it always renders them); the main-column copy is gone.
+- **Two "Updated" timestamps** — the hero's static "Updated HH:mm · data
+  by Open-Meteo" footer is removed; the live FreshnessPill on the hourly
+  section header (relative, ticking) and the footer's Open-Meteo credit
+  were already covering it.
+- **48-hour temperatures rendered back-to-back twice** — the temperature
+  graph card and the hour-by-hour strip showed the same 48 temps + precip
+  chances stacked. Now ONE card with an inset segmented control
+  (Hours | Graph): the strip by default, the curve (ensemble band,
+  precip bars) a tap away.
+- **Moon phase shown in two sections** — the Details moon card is gone;
+  the Sky & photography card's 14-night calendar (tonight first) is the
+  single source.
+- **UV index shown twice inside Details** — the metric-grid UV tile is
+  gone; the Sun Safety card directly below owns UV (curve, current value,
+  burn times). The grid reflows to a balanced 3-column layout at lg
+  (7 tiles + the 2-col Sun path arc fill every row).
+- **Feels-like shown twice** — the metric-grid tile is gone; the hero
+  readout + the temperature dialog's "Feels like" tab own it.
+- **Sunrise/sunset times shown three times** — the Daylight card's
+  sunrise/sunset stat tiles are gone (hero chip + Sun path card own the
+  times); Daylight keeps what only it knows: night length (folded into
+  the header), daily delta, the year gauge and solstice countdown.
+- **MenuBar city + clock** duplicated the hero's city/date/local-time
+  block at the top of the page. The resting state is now intentionally
+  empty — the compact weather summary still fades in when scrolling.
+
+### Changed (contrast & readability)
+- **Dark-scene text tiers lifted** — `--surface-muted` .8 → .92,
+  `--surface-faint` .66 → .82, `--surface-text` brightened (the old
+  values measured ~4.2:1 on tinted cards and visibly failed on 10–12px
+  labels).
+- **Light-scene ink deepened** — `--surface-text` #0e2a2e → #0a2226,
+  `--surface-muted` .78 → .88, `--surface-faint` .62 → .74, light
+  hairline .14 → .16.
+- HourlyStrip temperatures now use the scene-aware `text-surface` token
+  (previously inherited raw page foreground), and low-probability precip
+  percentages upgraded faint → muted + medium weight.
+- Search/AI inputs, sidebar sub-labels, chip captions and every
+  `text-surface-faint`/`text-surface-muted` consumer inherit the lifted
+  tiers automatically (single-token fix).
+
 ## [4.1.0] — 2026-10-14
 
 Contrast, color and theme repair round — driven by the "ui destroyed /

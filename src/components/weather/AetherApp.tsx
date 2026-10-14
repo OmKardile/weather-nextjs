@@ -452,9 +452,9 @@ export function AetherApp() {
                         onRefresh={() => weather.refetch()}
                         refreshing={weather.isFetching}
                       />
-                      <div className="mt-4">
-                        <OfficialAlerts city={activeCity} bundle={bundle} />
-                      </div>
+                      {/* Official alerts live ONLY in the forecast drawer below
+                          (it renders them once) — a second copy here was pure
+                          duplication on the mobile Today tab. */}
                       <div className="mt-4">
                         <BriefingCard city={activeCity} units={units} />
                       </div>

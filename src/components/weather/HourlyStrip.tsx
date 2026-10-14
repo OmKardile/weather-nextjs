@@ -83,7 +83,7 @@ export function HourlyStrip({ hours, units, goldenWindows = [] }: HourlyStripPro
               {isNow ? 'Now' : formatHour(hour.time, units)}
             </span>
             <WeatherIcon condition={hour.condition} isDay={hour.isDay} size={30} />
-            <span className={cn('tnum relative text-sm font-semibold', isNow && 'text-[15px] font-bold')}>
+            <span className={cn('tnum relative text-sm font-semibold text-surface', isNow && 'text-[15px] font-bold')}>
               {formatTemp(hour.temperature, units)}
             </span>
             {/* Burn-risk row — only on UV ≥ 6 hours, band-colored so the
@@ -104,10 +104,10 @@ export function HourlyStrip({ hours, units, goldenWindows = [] }: HourlyStripPro
             ) : null}
             <span
               className={cn(
-                'tnum relative flex items-center gap-0.5 text-[10px]',
+                'tnum relative flex items-center gap-0.5 text-[10px] font-medium',
                 hour.precipitationProbability >= 30
                   ? 'text-aurora-300'
-                  : 'text-surface-faint',
+                  : 'text-surface-muted',
               )}
             >
               <Droplets className="h-2.5 w-2.5" aria-hidden="true" />

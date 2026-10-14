@@ -6,21 +6,18 @@ import {
   Eye,
   Gauge,
   Sun,
-  Thermometer,
   Umbrella,
   Wind,
 } from 'lucide-react';
 import { daylightLength, sunProgress } from '@/lib/time';
 import {
   compassPoint,
-  displayTemp,
   formatHour,
   formatPrecip,
   formatPressure,
   formatTemp,
   formatVisibility,
   formatWind,
-  uvInfo,
   visibilityLabel,
 } from '@/lib/units';
 import { ExpandableCard } from '@/components/weather/ExpandableCard';
@@ -186,14 +183,11 @@ export function MetricGrid({ data, units, city }: MetricGridProps) {
   const { current, hourly } = data;
   const next24 = hourly as HourlyPoint[];
   const maxPrecipChance = Math.max(...next24.map((hour) => hour.precipitationProbability), 0);
-  const uvNow = next24[0]?.uvIndex ?? 0;
   const visibilityM = next24[0]?.visibility ?? 24_000;
   const dp = dewPoint(current.temperature, current.humidity);
-  const uvInfoNow = uvInfo(uvNow);
-  const uvPosition = Math.min(uvNow / 11, 1) * 100;
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
       <WindCompass data={data} units={units} />
       <MarineCard city={city} units={units} />
 
@@ -214,34 +208,9 @@ export function MetricGrid({ data, units, city }: MetricGridProps) {
         </div>
       </ExpandableCard>
 
-      <ExpandableCard
-        label="UV index"
-        group="uv"
-        bundle={data}
-        units={units}
-        icon={<Sun className="h-3.5 w-3.5" />}
-      >
-        <div className="mt-2 flex items-baseline gap-2">
-          <span className="tnum text-xl font-semibold text-surface">{uvNow.toFixed(1)}</span>
-          <span className="text-xs font-medium" style={{ color: uvInfoNow.color }}>
-            {uvInfoNow.label}
-          </span>
-        </div>
-        <div className="relative mt-2.5 h-1.5 rounded-full" aria-hidden="true">
-          <div
-            className="absolute inset-0 rounded-full"
-            style={{
-              background:
-                'linear-gradient(90deg, #22BCA0 0%, #E8C54D 35%, #F0954A 60%, #E1552F 80%, #9B4A9E 100%)',
-              opacity: 0.85,
-            }}
-          />
-          <div
-            className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-white shadow"
-            style={{ left: `${uvPosition}%`, background: uvInfoNow.color }}
-          />
-        </div>
-      </ExpandableCard>
+      {/* UV and Feels-like were removed here (v4.2 dedup): the Sun Safety
+          card directly below this grid owns UV (curve + current value +
+          burn times), and the hero + temperature dialog own feels-like. */}
 
       <ExpandableCard
         label="Visibility"
@@ -299,25 +268,6 @@ export function MetricGrid({ data, units, city }: MetricGridProps) {
         </p>
         <p className="tnum mt-1 text-xs text-surface-muted">
           Up to {maxPrecipChance}% chance in 24h
-        </p>
-      </ExpandableCard>
-
-      <ExpandableCard
-        label="Feels like"
-        group="temp"
-        bundle={data}
-        units={units}
-        icon={<Thermometer className="h-3.5 w-3.5" />}
-      >
-        <p className="tnum mt-2 text-xl font-semibold text-surface">
-          {displayTemp(current.apparentTemperature, units)}°
-        </p>
-        <p className="mt-1 text-xs text-surface-muted">
-          {current.apparentTemperature > current.temperature + 0.5
-            ? 'Humidity makes it feel warmer'
-            : current.apparentTemperature < current.temperature - 0.5
-              ? 'Wind makes it feel cooler'
-              : 'Close to actual temperature'}
         </p>
       </ExpandableCard>
 

@@ -26,11 +26,10 @@ import { DailyForecast } from '@/components/weather/DailyForecast';
 import { ForecastConfidence } from '@/components/weather/ForecastConfidence';
 import { ForecastLedgerCard } from '@/components/weather/ForecastLedgerCard';
 import { FreshnessPill } from '@/components/weather/FreshnessPill';
-import { HourlyStrip } from '@/components/weather/HourlyStrip';
+import { HourlyForecastCard } from '@/components/weather/HourlyForecastCard';
 import { Icon } from '@/components/icons/Icon';
 import { MetricGrid } from '@/components/weather/MetricGrid';
 import { ModelCompare } from '@/components/weather/ModelCompare';
-import { MoonPhaseCard } from '@/components/weather/MoonPhaseCard';
 import { NextHourCard } from '@/components/weather/NextHourCard';
 import { daySkyTimes } from '@/components/weather/sky/sky-time';
 import { AuroraCard } from '@/components/weather/sky/AuroraCard';
@@ -38,7 +37,6 @@ import { DaylightCard } from '@/components/weather/sky/DaylightCard';
 import { SkyCard } from '@/components/weather/sky/SkyCard';
 import { SunSafetyCard } from '@/components/weather/SunSafetyCard';
 import { TimeMachineCard } from '@/components/weather/sky/TimeMachineCard';
-import { TemperatureChart } from '@/components/weather/TemperatureChart';
 import { useEditMode } from '@/hooks/use-edit-mode';
 import { useEnsemble } from '@/hooks/use-ensemble';
 import { useModels } from '@/hooks/use-models';
@@ -354,16 +352,13 @@ export function ForecastSections({ city, bundle, units }: ForecastSectionsProps)
         case 'hourly':
           return (
             <>
-              <div className="glass fs-card rounded-[var(--radius-card)] p-4 shadow-[var(--shadow-glass)] sm:p-5">
-                <TemperatureChart
-                  hours={bundle.hourly}
-                  units={units}
-                  ensemble={ensemble.data?.hourly ?? null}
-                />
-              </div>
-              <div className="fs-stack mt-3">
-                <HourlyStrip hours={bundle.hourly} units={units} goldenWindows={goldenWindows} />
-              </div>
+              {/* One card, two views (Hours | Graph) — see HourlyForecastCard. */}
+              <HourlyForecastCard
+                hours={bundle.hourly}
+                units={units}
+                ensemble={ensemble.data?.hourly ?? null}
+                goldenWindows={goldenWindows}
+              />
               <div className="fs-stack mt-3">
                 <NextHourCard minutely={bundle.minutely} units={units} />
               </div>
@@ -420,9 +415,9 @@ export function ForecastSections({ city, bundle, units }: ForecastSectionsProps)
               <div className="fs-stack mt-4">
                 <SunSafetyCard city={city} bundle={bundle} units={units} />
               </div>
-              <div className="fs-stack mt-4 sm:max-w-sm">
-                <MoonPhaseCard bundle={bundle} />
-              </div>
+              {/* Moon lives in ONE place: the Sky & photography card's
+                  14-night calendar (tonight's phase + illumination first).
+                  A separate details-section moon card repeated it. */}
             </>
           );
         case 'timemachine':
