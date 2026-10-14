@@ -1105,3 +1105,19 @@ Stage Summary:
 - Key decisions: badge only while OFF the Today tab; merge logic lives in lib (not the component) so the badge hook and banners share one implementation at one fetch cost; install row is silent unless it can actually do something.
 - Unresolved / next-phase: /api/weather 502s (external Open-Meteo flakiness — watch, don't fix locally); SACHET upstream aborts (route handles); VLM false-positive "sidebar temps = dup" remains intentional; WebKit/Firefox paths still code-path-only.
 - Environment reminders: ONE agent-browser session; fresh `open` resets localStorage (re-seed with countryCode for alerts QA!); agent-browser network route mock is the way to test alert UIs with no live feed; /tmp/start-dev.py for daemon restarts.
+
+---
+Task ID: 33
+Agent: main (Z.ai Code)
+Task: Push-divergence incident + hygiene fix (follow-up to Task 32's v4.3.0).
+
+Work Log:
+- v4.3.0 push was rejected (non-fast-forward): a concurrent cron-triggered agent round (request id 21fc27ba) had run `git commit --amend` on the already-pushed 5319d28 worklog commit (regenerating zips) and committed a .zscripts/dev.pid change — rewriting local history after the remote already had it.
+- Resolved WITHOUT force-push: `git rebase --onto origin/main bc1eb48 main` replayed the divergent commits onto the pushed head; worklog verified unduplicated (1× Task 31, 1× Task 32).
+- Hygiene: .zscripts/dev.pid untracked + gitignored (runtime pid, changes every restart — was generating noise commits for cron rounds).
+- RULE for all future automated rounds: NEVER `git commit --amend` after a commit has been pushed; if a push is rejected, `git fetch origin && git pull --rebase origin main` and resolve. Never force-push.
+
+Stage Summary:
+- Remote origin/main now carries v4.3.0 cleanly on top of the pushed history; no force-push used; dev.pid can no longer generate conflict noise between concurrent rounds.
+- Cron status: jobs 459800/459803 hit "exec limits exceeded" (session quota) — 459803 remains registered-but-disabled; a round DID fire once before the quota blocked (it caused the amend above — the cron message now in 459803 already forbids amending/force-push but evidently needs this rule reinforced: worklog Task 33 records it).
+- Next-phase candidates: same as Task 32 (Open-Meteo upstream 502 flakiness — monitor; SACHET aborts — handled; badge/iOS-haptics real-device verification).

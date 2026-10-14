@@ -54,3 +54,6 @@ server.log
 /skills/
 # tool result artifacts (not source)
 /tool-results/
+
+# dev server runtime pid (regenerated every restart — never commit)
+.zscripts/dev.pid
