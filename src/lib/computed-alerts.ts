@@ -48,6 +48,57 @@ function dayLabel(bundle: WeatherBundle, iso: string): string {
   return `${month} ${Number(date.slice(8, 10))}`.trim();
 }
 
+/* ------------------------------------------------------------------ */
+/* Merge — dedupe computed alerts that restate an official product      */
+/* (moved here so the banner component and the dock-badge hook share    */
+/* one implementation without a circular import)                        */
+/* ------------------------------------------------------------------ */
+
+const TITLE_STOPWORDS = new Set([
+  'the', 'and', 'for', 'with', 'from', 'this', 'that',
+  'warning', 'watch', 'advisory', 'statement', 'alert', 'notice',
+  'expected', 'ahead', 'today', 'tonight', 'possible', 'issued',
+]);
+
+function titleTokens(title: string): Set<string> {
+  return new Set(
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((word) => word.length >= 3 && !TITLE_STOPWORDS.has(word))
+      // crude plural stem — "thunderstorms" ≈ "thunderstorm"
+      .map((word) => (word.length > 3 && word.endsWith('s') ? word.slice(0, -1) : word)),
+  );
+}
+
+function isSimilarTitle(a: string, b: string): boolean {
+  const tokensA = titleTokens(a);
+  const tokensB = titleTokens(b);
+  if (tokensA.size === 0 || tokensB.size === 0) return false;
+  let overlap = 0;
+  for (const token of tokensA) if (tokensB.has(token)) overlap += 1;
+  return overlap / Math.min(tokensA.size, tokensB.size) >= 0.6;
+}
+
+/**
+ * Merge official-feed alerts with Aether-computed alerts: computed entries
+ * whose title ≈ an official product are dropped (the official one wins),
+ * then the union is severity-ranked and capped at 5.
+ */
+export function mergeAlerts(official: Alert[], computed: Alert[]): Alert[] {
+  const kept = computed.filter(
+    (candidate) => !official.some((existing) => isSimilarTitle(existing.title, candidate.title)),
+  );
+  return [...official, ...kept]
+    .sort(
+      (a, b) =>
+        ALERT_SEVERITY_RANK[a.severity] - ALERT_SEVERITY_RANK[b.severity] ||
+        (a.expires ?? '9999').localeCompare(b.expires ?? '9999'),
+    )
+    .slice(0, 5);
+}
+
 /**
  * Derive computed alerts from forecast data.
  *

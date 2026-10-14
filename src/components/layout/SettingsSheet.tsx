@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Glass } from '@/components/glass/Glass';
 import { Icon } from '@/components/icons/Icon';
 import { useEditMode } from '@/hooks/use-edit-mode';
+import { useInstallPrompt } from '@/hooks/use-install-prompt';
 import { usePreferences } from '@/hooks/use-preferences';
 import type { Density } from '@/hooks/use-preferences';
 import { requestTiltPermission } from '@/hooks/use-tilt-glow';
@@ -403,6 +404,45 @@ function BadgeShelf(): JSX.Element {
   );
 }
 
+/* ------------------------------------------------------------------ */
+/* Install app — PWA install (Chromium prompt) / iOS manual hint       */
+/* ------------------------------------------------------------------ */
+
+function InstallAppRow(): JSX.Element | null {
+  const { canInstall, isStandalone, isIOS, installed, install } = useInstallPrompt();
+
+  // Already installed, or installed this session → nothing to offer.
+  if (isStandalone || installed) return null;
+  // Chromium with a live deferred prompt → the real one-tap install.
+  if (canInstall) {
+    return (
+      <SettingsRow label="Install app" hint="Add Aether to your home screen — full screen, offline cache">
+        <button
+          type="button"
+          onClick={install}
+          className="focus-ring surface-subtle inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-semibold text-surface transition-transform duration-200 ease-[var(--ease-spring-bouncy)] active:scale-95"
+        >
+          <Icon name="sparkle" size={13} aria-hidden="true" />
+          Install
+        </button>
+      </SettingsRow>
+    );
+  }
+  // iOS Safari: no programmatic prompt — teach the Share flow instead.
+  if (isIOS) {
+    return (
+      <SettingsRow label="Add to Home Screen" hint="In Safari: tap the Share button, then “Add to Home Screen”">
+        <span className="surface-subtle inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium text-surface-muted">
+          <Icon name="share" size={13} aria-hidden="true" />
+          Manual
+        </span>
+      </SettingsRow>
+    );
+  }
+  // Everything else (desktops without prompt support): stay silent.
+  return null;
+}
+
 export function SettingsContent({
   units,
   onSetUnits,
@@ -473,6 +513,8 @@ export function SettingsContent({
         <AmbientSoundControl />
       </SettingsRow>
 
+      <InstallAppRow />
+
       <SettingsRow label="Customize cards" hint="Opens your forecast cards — drag to reorder, × to hide">
         <CustomizeCardsControl onCustomize={onCustomize} />
       </SettingsRow>
@@ -515,7 +557,7 @@ export function SettingsContent({
 
       <div className="py-3.5">
         <p className="text-xs leading-relaxed text-surface-faint">
-          Aether 4.2.1 · forecast &amp; air quality by Open-Meteo (CAMS) · geocoding by
+          Aether 4.3.0 · forecast &amp; air quality by Open-Meteo (CAMS) · geocoding by
           Open-Meteo &amp; Nominatim · AI by Gemini
         </p>
       </div>

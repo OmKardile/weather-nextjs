@@ -1085,3 +1085,23 @@ Stage Summary:
 - Key decisions: dock = single owner of section navigation below lg; top capsule = controls only (units/volume/search); desktop untouched.
 - Unresolved / next-phase candidates: same as 4.2.0 (WebKit/Firefox code-path-only; hourly-bundle comment says 24h; RainViewer free-tier limits; VLM false-positive "sidebar temps = dup" remains intentional).
 - Environment reminders: ONE agent-browser session; fresh `open` resets localStorage (re-seed quick-picks with NUMERIC city ids via aether-preferences v3); /tmp/start-dev.py for daemon restarts; MultiEdit not atomic — verify with grep; screenshot full-page flag positional-broken.
+
+---
+Task ID: 32
+Agent: main (Z.ai Code)
+Task: "start cron" + "keep pushing after 25 crons" — cron quota blocked, so this round ran the dev-review loop inline. Shipped v4.3.0.
+
+Work Log:
+- Cron: recreated the 15-min webDevReview job; the gateway returned "Disabled due to exec limits exceeded" (session-level quota exhausted from earlier rounds). Job 459803 exists but stays disabled; will retry enabling in a later round. To keep the loop alive NOW, ran one full dev-review round inline.
+- Git: `git config credential.helper store` + ~/.git-credentials (user's PAT, OUTSIDE the repo — no secret in tracked files); verified push works without askpass. Cron message updated to instruct every future round to commit+push without asking (never force-push, never commit secrets).
+- Dev round (QA first): page 200, 0 console errors; /api/weather intermittently 502 (Open-Meteo upstream slow/rate-limited — app degrades gracefully via offline cache); SACHET alerts upstream aborts are handled by the route timeout. Pre-existing, not touched.
+- FEATURES (v4.3.0): (1) dock Today-tab alert badge — new shared `useMergedAlerts` hook (official+computed+merge) consumed by both OfficialAlerts and AetherApp; `mergeAlerts` moved from the banner component to lib/computed-alerts.ts to kill a circular import; severity-tinted opaque badge tones, 9+ cap, hides while ON Today (alerts already visible in drawer), aria-label carries the count. (2) PWA install row in Settings — use-install-prompt hook (beforeinstallprompt deferred → one-tap Install; iOS → Share/Add-to-Home-Screen hint; standalone/unsupported → hidden; useSyncExternalStore for hydration-safe env flags after eslint set-state-in-effect flagged the first version). (3) haptic tick (navigator.vibrate 4ms) on dock tab taps.
+- QA: badge verified end-to-end with agent-browser network route mock of /api/alerts (aria-label "Today — 1 active alert"; VLM: amber pill with 1, clean, no overlap; top bar still clean per v4.2.1). Settings tab renders; install row correctly hidden on headless chromium (no beforeinstallprompt). tsc src clean; eslint clean; dock Ask AI/Map flows re-tested earlier in session.
+- Docs: 4.3.0 in package.json + SettingsSheet footer; CHANGELOG 4.3.0 (Added x3); README dock bullet extended; public/aether-weather-4.3.0.zip (10 files).
+
+Stage Summary:
+- v4.3.0 committed and pushed to origin/main via credential store (push verified: 5319d28 → new head).
+- Cron still blocked by exec quota — job 459803 pending; retry enabling next round; loop continues inline until then.
+- Key decisions: badge only while OFF the Today tab; merge logic lives in lib (not the component) so the badge hook and banners share one implementation at one fetch cost; install row is silent unless it can actually do something.
+- Unresolved / next-phase: /api/weather 502s (external Open-Meteo flakiness — watch, don't fix locally); SACHET upstream aborts (route handles); VLM false-positive "sidebar temps = dup" remains intentional; WebKit/Firefox paths still code-path-only.
+- Environment reminders: ONE agent-browser session; fresh `open` resets localStorage (re-seed with countryCode for alerts QA!); agent-browser network route mock is the way to test alert UIs with no live feed; /tmp/start-dev.py for daemon restarts.

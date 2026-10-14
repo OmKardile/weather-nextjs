@@ -14,6 +14,7 @@ import { useEditMode } from '@/hooks/use-edit-mode';
 import { loadCachedBundle } from '@/lib/sections';
 import { getScene } from '@/lib/scenes';
 import { getDayPhase } from '@/lib/time';
+import { useMergedAlerts } from '@/hooks/use-merged-alerts';
 import type { City, Condition, DayPhase, WeatherBundle } from '@/types/weather';
 import { Glass } from '@/components/glass/Glass';
 import { useLiquidGlassVars } from '@/components/glass/LiquidGlass';
@@ -353,6 +354,9 @@ export function AetherApp() {
   // extra wrapper div: it would shift useId paths and break hydration).
   const liquidGlassVars = useLiquidGlassVars();
 
+  // Dock Today-badge feed (shares queries with OfficialAlerts — one fetch).
+  const { alerts: mergedAlerts, topSeverity } = useMergedAlerts(activeCity, bundle);
+
   // Device-tilt ambient glass highlight (motion sensor; permission-gated
   // on iOS via the Settings switch). Off with Reduce bright effects.
   const tiltGlowEnabled = usePreferences((state) => state.tiltGlowEnabled);
@@ -556,8 +560,15 @@ export function AetherApp() {
         )}
       </div>
 
-      {/* Mobile dock */}
-      <MobileDock active={dockTab} onChange={handleDockTab} />
+      {/* Mobile dock — the Today tab carries the active-alert count while
+          the user is on another tab (on Today the alerts are already on
+          screen in the forecast drawer). */}
+      <MobileDock
+        active={dockTab}
+        onChange={handleDockTab}
+        alertCount={mergedAlerts.length}
+        alertSeverity={topSeverity ?? 'moderate'}
+      />
 
       {/* Mobile forecast drawer — Today tab with data */}
       {dockTab === 'today' && activeCity && bundle && (

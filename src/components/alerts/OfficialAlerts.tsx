@@ -1,11 +1,10 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import type { JSX, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { Icon } from '@/components/icons/Icon';
-import { ALERT_SEVERITY_RANK, computedAlerts } from '@/lib/computed-alerts';
-import { useFlood, useOfficialAlerts, useSpaceWeather } from '@/hooks/use-official-alerts';
+import { useMergedAlerts } from '@/hooks/use-merged-alerts';
 import type { Alert, AlertSeverity, City, WeatherBundle } from '@/types/weather';
 import './alerts.css';
 
@@ -58,50 +57,6 @@ function formatAlertTime(iso: string): string {
   const [, , month, day, time] = match;
   const utc = /(?:Z|[+-]00:?00)$/.test(iso);
   return `${MONTHS_SHORT[Number(month) - 1]} ${Number(day)}, ${time}${utc ? ' UTC' : ''}`;
-}
-
-/* ------------------------------------------------------------------ */
-/* Merge — dedupe computed alerts that restate an official product      */
-/* ------------------------------------------------------------------ */
-
-const TITLE_STOPWORDS = new Set([
-  'the', 'and', 'for', 'with', 'from', 'this', 'that',
-  'warning', 'watch', 'advisory', 'statement', 'alert', 'notice',
-  'expected', 'ahead', 'today', 'tonight', 'possible', 'issued',
-]);
-
-function titleTokens(title: string): Set<string> {
-  return new Set(
-    title
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .split(/\s+/)
-      .filter((word) => word.length >= 3 && !TITLE_STOPWORDS.has(word))
-      // crude plural stem — "thunderstorms" ≈ "thunderstorm"
-      .map((word) => (word.length > 3 && word.endsWith('s') ? word.slice(0, -1) : word)),
-  );
-}
-
-function isSimilarTitle(a: string, b: string): boolean {
-  const tokensA = titleTokens(a);
-  const tokensB = titleTokens(b);
-  if (tokensA.size === 0 || tokensB.size === 0) return false;
-  let overlap = 0;
-  for (const token of tokensA) if (tokensB.has(token)) overlap += 1;
-  return overlap / Math.min(tokensA.size, tokensB.size) >= 0.6;
-}
-
-function mergeAlerts(official: Alert[], computed: Alert[]): Alert[] {
-  const kept = computed.filter(
-    (candidate) => !official.some((existing) => isSimilarTitle(existing.title, candidate.title)),
-  );
-  return [...official, ...kept]
-    .sort(
-      (a, b) =>
-        ALERT_SEVERITY_RANK[a.severity] - ALERT_SEVERITY_RANK[b.severity] ||
-        (a.expires ?? '9999').localeCompare(b.expires ?? '9999'),
-    )
-    .slice(0, 5);
 }
 
 /* ------------------------------------------------------------------ */
@@ -292,19 +247,9 @@ export function OfficialAlerts({
   city: City | null;
   bundle: WeatherBundle | null;
 }): JSX.Element | null {
-  const officialQuery = useOfficialAlerts(city, bundle?.fetchedAt);
-  const floodQuery = useFlood(city, bundle?.fetchedAt);
-  const spaceQuery = useSpaceWeather(bundle != null, bundle?.fetchedAt);
-
-  const computed = useMemo(
-    () => (bundle ? computedAlerts(bundle, floodQuery.data, spaceQuery.data) : []),
-    [bundle, floodQuery.data, spaceQuery.data],
-  );
-
-  const merged = useMemo(
-    () => mergeAlerts(officialQuery.data?.alerts ?? [], computed),
-    [officialQuery.data, computed],
-  );
+  // Shared hook (also feeds the dock's Today badge) — TanStack dedupes
+  // the underlying queries by key, so two consumers cost one fetch.
+  const { alerts: merged, isLoading } = useMergedAlerts(city, bundle);
 
   // Collapsed-summary state, reset render-time when the city changes
   // (no set-state-in-effect).
@@ -318,9 +263,7 @@ export function OfficialAlerts({
   if (!city || !bundle) return null;
 
   // First official fetch with nothing computed to show yet → shimmer.
-  const showSkeleton =
-    officialQuery.data == null && officialQuery.isFetching && computed.length === 0;
-  if (showSkeleton) return <SkeletonStack />;
+  if (isLoading) return <SkeletonStack />;
 
   // Silence renders nothing — no "all clear" card.
   if (merged.length === 0) return null;

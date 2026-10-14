@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.3.0] — 2026-10-15
+
+Dock awareness + installability — the mobile dock now carries live alert
+context, taps tick, and the app can be installed from Settings.
+
+### Added
+- **Alert badge on the dock's Today tab** — while the user is on any other
+  tab, a severity-tinted count pill (9+ cap, AA-contrast opaque tones)
+  shows how many official/computed alerts are active for the current city.
+  It hides on the Today tab itself (the alerts are already on screen in
+  the forecast drawer — noise, not signal) and exposes its count to screen
+  readers via the button's aria-label ("Today — 2 active alerts").
+  The merged list comes from a new shared `useMergedAlerts` hook that
+  OfficialAlerts and the dock consume together — TanStack dedupes the
+  underlying queries, so two consumers still cost one fetch. The merge
+  logic (`mergeAlerts` + title-similarity dedupe) moved from the banner
+  component into `lib/computed-alerts.ts`, killing a would-be circular
+  import.
+- **PWA install row in Settings** — Chromium's deferred
+  `beforeinstallprompt` powers a one-tap "Install app" button (the
+  browser's own mini-banner is suppressed); iPhone/iPad get a
+  "Share → Add to Home Screen" hint row instead (they never fire the
+  event); already-installed or unsupported sessions see nothing.
+  Environment flags go through `useSyncExternalStore` so SSR and the
+  first client render agree.
+- **Haptic tap feedback on dock tabs** — a 4ms `navigator.vibrate` tick
+  on tab switches (Android/Chromium; silent no-op elsewhere).
+
+### Changed
+- `useMergedAlerts` also reports `topSeverity` and a first-fetch
+  `isLoading` flag, so the banner stack keeps its shimmer skeleton with
+  the merge logic now shared.
+
 ## [4.2.1] — 2026-10-14
 
 Mobile chrome de-duplication — "remove the upside tab bar / dock in
