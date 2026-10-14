@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.2.1] — 2026-10-14
+
+Mobile chrome de-duplication — "remove the upside tab bar / dock in
+smaller screens, it's duplicating".
+
+### Fixed (duplication)
+- **On screens below `lg` the top menu-bar capsule repeated the bottom
+  dock's navigation**: its Ask AI and Map buttons did exactly what the
+  dock's "Ask AI" and "Map" tabs do (same handlers, same targets). Both
+  buttons are now `hidden lg:flex` — the floating dock is the single
+  owner of section navigation on small screens. The top capsule keeps
+  only true controls on mobile (°C/°F toggle, ambient volume at sm+,
+  search). Desktop (lg+) is unchanged: the dock is hidden there, so the
+  top bar still carries every control.
+- Verified via vision audit at 390px (top capsule = °C/°F + search
+  only; dock = Today / Map / Ask AI / Cities / Settings; no overlap)
+  and at 1280px (all seven desktop controls intact); dock tab flows
+  (Ask AI panel, MapLibre render, map close) re-tested with zero
+  console errors.
+
 ## [4.2.0] — 2026-10-14
 
 De-duplication + readability round — "remove the things which are

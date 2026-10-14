@@ -222,10 +222,15 @@ export function MenuBar({
           <ClusterButton label="Search and commands" onClick={onOpenPalette}>
             <Icon name="search" size={20} />
           </ClusterButton>
+          {/* v4.2.1 dedup: Ask AI + Map live in the mobile dock below lg —
+              rendering them here too was double navigation (user report:
+              "top bar/dock duplicating"). Hidden below lg, the dock is the
+              single owner of section navigation on small screens. */}
           <ClusterButton
             label={aiOpen ? 'Close Ask AI' : 'Ask AI'}
             onClick={onToggleAi}
             active={aiOpen}
+            className="hidden lg:flex"
           >
             <Icon name="sparkle" size={20} animated />
           </ClusterButton>
@@ -233,6 +238,7 @@ export function MenuBar({
             label={mapOpen ? 'Close map' : 'Open map'}
             onClick={onToggleMap}
             active={mapOpen}
+            className="hidden lg:flex"
           >
             <Icon name="map" size={20} animated />
           </ClusterButton>

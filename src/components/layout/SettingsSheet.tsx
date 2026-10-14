@@ -515,7 +515,7 @@ export function SettingsContent({
 
       <div className="py-3.5">
         <p className="text-xs leading-relaxed text-surface-faint">
-          Aether 4.2.0 · forecast &amp; air quality by Open-Meteo (CAMS) · geocoding by
+          Aether 4.2.1 · forecast &amp; air quality by Open-Meteo (CAMS) · geocoding by
           Open-Meteo &amp; Nominatim · AI by Gemini
         </p>
       </div>
