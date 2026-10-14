@@ -53,10 +53,19 @@
 }
 
 /* Light scenes: brighter tint + a touch of black so controls read over
-   pale skies (Apple lightens AND dims simultaneously). */
+   pale skies (Apple lightens AND dims simultaneously). INK text/icons —
+   iOS light glass uses dark labels; white-on-milk here was effectively
+   invisible (≈1.1:1) and a root cause of the v4.1 contrast reports. */
 [data-surface='light'] .lg {
-  background-color: rgb(255 255 255 / calc(min(0.28, var(--lg-tint-a, 0.06) + 0.14)));
-  background-image: linear-gradient(rgb(0 0 0 / 0.04), rgb(0 0 0 / 0.04));
+  background-color: rgb(255 255 255 / calc(min(0.34, var(--lg-tint-a, 0.06) + 0.16)));
+  background-image: linear-gradient(rgb(0 0 0 / 0.03), rgb(0 0 0 / 0.03));
+  color: var(--ink, #0e2a2e);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / calc(0.6 * var(--lg-rim, 1))),
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.2),
+    inset 0 0 18px rgb(255 255 255 / 0.08),
+    0 10px 30px rgb(66 92 88 / 0.22),
+    0 2px 6px rgb(66 92 88 / 0.12);
 }
 
 /* Clear variant — ONLY over the full-screen map. Less tint, more
@@ -199,11 +208,11 @@
 }
 
 [data-surface='light'] .lg-selected {
-  background: rgb(255 255 255 / 0.55);
+  background: rgb(255 255 255 / 0.62);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.8),
-    inset 0 0 0 0.5px rgb(255 255 255 / 0.6),
-    0 1px 4px rgb(66 92 88 / 0.2);
+    inset 0 1px 0 rgb(255 255 255 / 0.85),
+    inset 0 0 0 0.5px rgb(255 255 255 / 0.65),
+    0 1px 4px rgb(66 92 88 / 0.22);
 }
 
 /* ================================================================== */
@@ -220,8 +229,10 @@
   background-image: linear-gradient(rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.05));
   -webkit-backdrop-filter: blur(22px) saturate(1.4);
   backdrop-filter: blur(22px) saturate(1.4);
-  border: 1px solid rgb(255 255 255 / 0.12);
-  box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.16);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.07),
+    0 8px 28px rgb(0 0 0 / 0.16);
 }
 
 /* Raised surface — one feature surface per view (AI briefing card). */
@@ -231,10 +242,10 @@
   background-image: linear-gradient(rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.06));
   -webkit-backdrop-filter: blur(26px) saturate(1.45);
   backdrop-filter: blur(26px) saturate(1.45);
-  border: 1px solid rgb(255 255 255 / 0.14);
+  border: 1px solid rgb(255 255 255 / 0.18);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.12),
-    0 10px 30px rgb(0 0 0 / 0.16);
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    0 12px 34px rgb(0 0 0 / 0.2);
 }
 
 /* Subtle — chips, pills, inline controls. PLAIN FILL (no backdrop
@@ -330,27 +341,31 @@
   background-color: rgb(255 255 255 / 0.32);
 }
 
-/* Light scenes: milkier white + faint dark undertone + ink hairline. */
+/* Light scenes: milkier white + faint dark undertone + ink hairline.
+   Hairline lifted to .16 (was .10) — a faint edge was a big part of the
+   "weightless panel" look over pale skies. */
 [data-surface='light'] .surface,
 [data-surface='light'] .glass {
-  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.12));
-  border: 1px solid rgb(14 42 46 / 0.1);
-  box-shadow: 0 6px 20px rgb(66 92 88 / 0.14);
+  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.18));
+  border: 1px solid rgb(14 42 46 / 0.16);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.55),
+    0 6px 20px rgb(66 92 88 / 0.16);
 }
 
 [data-surface='light'] .surface-strong,
 [data-surface='light'] .glass-strong {
-  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.2));
-  border: 1px solid rgb(14 42 46 / 0.12);
+  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.24));
+  border: 1px solid rgb(14 42 46 / 0.18);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.6),
-    0 10px 30px rgb(66 92 88 / 0.18);
+    0 10px 30px rgb(66 92 88 / 0.2);
 }
 
 [data-surface='light'] .surface-subtle,
 [data-surface='light'] .glass-subtle {
-  background-color: rgb(255 255 255 / 0.42);
-  border: 1px solid rgb(14 42 46 / 0.1);
+  background-color: rgb(255 255 255 / 0.46);
+  border: 1px solid rgb(14 42 46 / 0.14);
 }
 
 /* Dark-scene hover for the flat fills stays in the dark family. */
@@ -451,8 +466,10 @@
   background-image: linear-gradient(rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.05));
   -webkit-backdrop-filter: blur(22px) saturate(1.4);
   backdrop-filter: blur(22px) saturate(1.4);
-  border: 1px solid rgb(255 255 255 / 0.12);
-  box-shadow: 0 6px 20px rgb(0 0 0 / 0.12);
+  border: 1px solid rgb(255 255 255 / 0.16);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.07),
+    0 8px 28px rgb(0 0 0 / 0.16);
 }
 
 .glass-2-raised {
@@ -460,10 +477,10 @@
   background-image: linear-gradient(rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.06));
   -webkit-backdrop-filter: blur(26px) saturate(1.45);
   backdrop-filter: blur(26px) saturate(1.45);
-  border: 1px solid rgb(255 255 255 / 0.14);
+  border: 1px solid rgb(255 255 255 / 0.18);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.12),
-    0 10px 30px rgb(0 0 0 / 0.16);
+    inset 0 1px 0 rgb(255 255 255 / 0.1),
+    0 12px 34px rgb(0 0 0 / 0.2);
 }
 
 .glass-2-overlay {
@@ -479,17 +496,19 @@
 }
 
 [data-surface='light'] .glass-2-base {
-  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.12));
-  border: 1px solid rgb(14 42 46 / 0.1);
-  box-shadow: 0 6px 20px rgb(66 92 88 / 0.14);
+  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.18));
+  border: 1px solid rgb(14 42 46 / 0.16);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.55),
+    0 6px 20px rgb(66 92 88 / 0.16);
 }
 
 [data-surface='light'] .glass-2-raised {
-  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.2));
-  border: 1px solid rgb(14 42 46 / 0.12);
+  background-color: rgb(255 255 255 / calc(var(--surface-tint-a, 0.1) + 0.24));
+  border: 1px solid rgb(14 42 46 / 0.18);
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / 0.6),
-    0 10px 30px rgb(66 92 88 / 0.18);
+    0 10px 30px rgb(66 92 88 / 0.2);
 }
 
 [data-surface='light'] .glass-2-overlay {
@@ -502,23 +521,44 @@
 }
 
 /* ================================================================== */
-/* Text vibrancy on scene / glass — white tiers (1.0 / .72 / .5)        */
-/* Never dark text on a dark scene.                                    */
+/* Text vibrancy on scene / glass — white tiers (1.0 / .86 / .70)        */
+/* Never dark text on a dark scene. v4.1: alphas lifted from .72/.5     */
+/* after measured AA failures on golden-hour scenes (white .5 over a    */
+/* mauve mid-tone ≈ 2.5:1); shadows deepened to match.                  */
 /* ================================================================== */
 
 .text-on-scene {
   color: rgb(255 255 255 / 1);
-  text-shadow: 0 2px 24px rgb(0 0 0 / 0.18);
+  text-shadow: 0 2px 28px rgb(0 0 0 / 0.26);
+}
+
+/* Light scenes: ink text — a light sky is a light-mode hero (the same
+   treatment the welcome state always used). Apple reserves white hero
+   text for dark skies; a dark veil heavy enough to save white text over
+   L≈0.7 mints would wreck the airy scene. Soft light halo for lift. */
+[data-surface='light'] .text-on-scene {
+  color: rgb(14 42 46 / 1);
+  text-shadow: 0 1px 10px rgb(255 255 255 / 0.4);
 }
 
 .text-on-scene-2 {
-  color: rgb(255 255 255 / 0.72);
-  text-shadow: 0 1px 16px rgb(0 0 0 / 0.16);
+  color: rgb(255 255 255 / 0.86);
+  text-shadow: 0 2px 18px rgb(0 0 0 / 0.24);
+}
+
+[data-surface='light'] .text-on-scene-2 {
+  color: rgb(14 42 46 / 0.82);
+  text-shadow: 0 1px 8px rgb(255 255 255 / 0.35);
 }
 
 .text-on-scene-3 {
-  color: rgb(255 255 255 / 0.5);
-  text-shadow: 0 1px 12px rgb(0 0 0 / 0.14);
+  color: rgb(255 255 255 / 0.7);
+  text-shadow: 0 1px 14px rgb(0 0 0 / 0.28);
+}
+
+[data-surface='light'] .text-on-scene-3 {
+  color: rgb(14 42 46 / 0.66);
+  text-shadow: 0 1px 6px rgb(255 255 255 / 0.3);
 }
 
 /* Ghost control — hero-row buttons (share / save / refresh) that sit
@@ -552,6 +592,21 @@
   opacity: 0.6;
 }
 
+/* Light scenes: ghost controls follow the ink hero family. */
+[data-surface='light'] .hero-ghost {
+  color: rgb(14 42 46 / 0.82);
+}
+
+[data-surface='light'] .hero-ghost:hover {
+  background-color: rgb(255 255 255 / 0.45);
+  border-color: rgb(14 42 46 / 0.18);
+  color: rgb(14 42 46 / 1);
+}
+
+[data-surface='light'] .hero-ghost:active {
+  background-color: rgb(255 255 255 / 0.55);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hero-ghost:active {
     transform: none;
@@ -567,19 +622,19 @@
   pointer-events: none;
   background: linear-gradient(
     to bottom,
-    rgb(0 0 0 / 0.18),
-    rgb(0 0 0 / 0.05) 30%,
-    transparent 48%
+    rgb(0 0 0 / 0.24),
+    rgb(0 0 0 / 0.14) 34%,
+    rgb(0 0 0 / 0.06) 54%,
+    transparent 68%
   );
 }
 
 [data-surface='light'] .hero-scrim {
   background: linear-gradient(
     to bottom,
-    rgb(6 24 26 / 0.52),
-    rgb(6 24 26 / 0.3) 30%,
-    rgb(6 24 26 / 0.08) 58%,
-    transparent 74%
+    rgb(6 24 26 / 0.16),
+    rgb(6 24 26 / 0.07) 30%,
+    transparent 55%
   );
 }
 
@@ -591,8 +646,8 @@
   pointer-events: none;
   background: linear-gradient(
     to top,
-    rgb(4 16 16 / 0.38),
-    rgb(4 16 16 / 0.1) 60%,
+    rgb(4 16 16 / 0.44),
+    rgb(4 16 16 / 0.12) 60%,
     transparent
   );
 }
@@ -600,8 +655,8 @@
 [data-surface='light'] .dock-scrim {
   background: linear-gradient(
     to top,
-    rgb(6 24 26 / 0.3),
-    rgb(6 24 26 / 0.06) 60%,
+    rgb(6 24 26 / 0.12),
+    rgb(6 24 26 / 0.04) 60%,
     transparent
   );
 }
@@ -626,8 +681,8 @@
 [data-surface='light'] .dock-content-scrim {
   background: linear-gradient(
     to top,
-    rgb(6 24 26 / 0.34),
-    rgb(6 24 26 / 0.13) 58%,
+    rgb(240 248 245 / 0.6),
+    rgb(240 248 245 / 0.22) 58%,
     transparent
   );
 }
@@ -641,6 +696,88 @@
     rgb(4 16 16 / 0.12) 58%,
     transparent
   );
+}
+
+/* ================================================================== */
+/* Scene-aware control text — v4.1                                      */
+/*                                                                      */
+/* Controls inside .lg inherit its color (white dark / ink light), so   */
+/* components must NOT hardcode text-white there. These classes give   */
+/* the remaining nested controls (segment wells) the same treatment,   */
+/* via opacity so they compose with the inherited scene color.         */
+/* ================================================================== */
+
+.seg-idle {
+  opacity: 0.72;
+}
+
+.seg-idle:hover {
+  opacity: 1;
+}
+
+.seg-active {
+  opacity: 1;
+}
+
+/* Active icon-button affordance inside a .lg capsule (MenuBar cluster). */
+.ctl-active {
+  background-color: rgb(255 255 255 / 0.16);
+}
+
+[data-surface='light'] .ctl-active {
+  background-color: rgb(14 42 46 / 0.12);
+}
+
+/* .segment-well owns the family color: white on dark wells, ink on
+   light-scene wells (a faint dark wash over a white card — white text
+   there was invisible). */
+.segment-well {
+  color: rgb(255 255 255 / 0.85);
+}
+
+[data-surface='light'] .segment-well {
+  color: rgb(14 42 46 / 0.85);
+}
+
+/* Dock tab glow — white halo reads as "lit glass" on dark scenes; a
+   soft ink shadow on light scenes. */
+.dock-glow {
+  filter: drop-shadow(0 0 10px rgb(255 255 255 / 0.45));
+}
+
+[data-surface='light'] .dock-glow {
+  filter: drop-shadow(0 1px 6px rgb(14 42 46 / 0.28));
+}
+
+/* Map chrome button (layers/close) — self-sufficient over both tile
+   palettes and both scene surfaces. */
+.mapctl {
+  background-color: rgb(255 255 255 / 0.12);
+  color: rgb(255 255 255 / 0.9);
+}
+
+.mapctl:hover {
+  color: rgb(255 255 255 / 1);
+}
+
+[data-surface='light'] .mapctl {
+  background-color: rgb(255 255 255 / 0.5);
+  color: rgb(14 42 46 / 0.9);
+  box-shadow: inset 0 0 0 0.5px rgb(14 42 46 / 0.12);
+}
+
+[data-surface='light'] .mapctl:hover {
+  color: rgb(14 42 46 / 1);
+}
+
+/* Footer hairline — scene-aware top border (replaces a broken
+   arbitrary-variant utility that never compiled). */
+.footer-hairline {
+  border-top: 1px solid rgb(255 255 255 / 0.1);
+}
+
+[data-surface='light'] .footer-hairline {
+  border-top-color: rgb(14 42 46 / 0.14);
 }
 
 /* ================================================================== */

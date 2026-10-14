@@ -743,7 +743,7 @@ export default function MapOverlay({ onClose, city, units, surface }: MapOverlay
           onClick={onClose}
           aria-label="Close map (Escape)"
           title="Close (Esc)"
-          className="focus-ring flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white/85 transition-colors duration-200 hover:text-white"
+          className="mapctl focus-ring flex h-9 w-9 items-center justify-center rounded-full transition-colors duration-200"
         >
           <Icon name="x" size={17} />
         </button>

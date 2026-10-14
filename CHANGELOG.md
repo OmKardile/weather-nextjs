@@ -5,6 +5,59 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0] — 2026-10-14
+
+Contrast, color and theme repair round — driven by the "ui destroyed /
+colors themes contrasts" report, measured with pixel sampling + vision
+audits at 390/1440 across dusk, dawn, day, night and welcome states.
+Two hard bugs and one systemic polarity error were the real culprits
+behind the "destroyed" look; every fix is verified with WCAG math.
+
+### Fixed
+- **Scene scrims were dead code** — `.hero-scrim`/`.dock-scrim` rendered
+  *before* the scene slots in `WeatherScene`, so the gradient painted over
+  them and no darkening ever applied. Reordered after the slots (DOM order
+  wins, same stacking context). This is why daytime heroes sat at ~1.3:1.
+- **Light-scene controls were white-on-white** — `.lg` capsules on
+  `[data-surface="light"]` fill near-white and every icon/label inside was
+  hardcoded `text-white` (°C/°F toggle measured ≈1.1:1). Light-scene `.lg`
+  now uses **ink labels** (iOS light-glass behavior, ≈10:1) and the
+  hardcoded whites were removed from MenuBar cluster + unit toggle,
+  MobileDock tabs, SegmentedControl options, and the map close button
+  (new scene-aware `.mapctl` / `.seg-*` / `.dock-glow` / `.ctl-active`
+  classes in glass.css).
+- **Dock bottom margin was a broken utility** — `mb-ax(12px,env(…))]` never
+  compiled, so the floating dock sat flush at the screen edge and ignored
+  the iOS safe-area inset. Now `mb-[max(12px,env(safe-area-inset-bottom))]`.
+- **Footer light-scene hairline** used an invalid arbitrary variant
+  (`[data-surface='light']_&:…`) that never generated CSS — replaced with
+  the `.footer-hairline` class.
+- Deleted the dead, untracked `TopBar.tsx`.
+
+### Changed
+- **Scene palettes retuned to a contrast contract** — all 16 dawn/dusk
+  (plus light-day family) stops now keep top+middle luminance ≤ ~0.17 on
+  dark-surface scenes, so white hero/menu text holds ≥ 4.5:1 before scrims
+  (metadata line 2.5:1 → 5–11.5:1; card interiors 4.4–7.6:1). Golden-hour
+  identity moved to the warm bottom stops + horizon sun glow (halo peak
+  softened .42 → .34 so it cannot fight card text). Light-day skies are
+  richer/deeper, killing the washed-out-mint welcome look.
+- **Scene-aware text polarity** — light day scenes render the hero in
+  **ink** with a soft light halo (matching the welcome heading); dark
+  scenes keep white vibrancy tiers, lifted .72/.5 → .86/.70 with deeper
+  text-shadows. Ghost hero buttons follow the same polarity.
+- **Card definition** — Surface cards gained brighter hairlines (.12 →
+  .16, ink .10 → .16 on light), an inset top highlight and deeper shadows
+  (and stronger light-scene fills) so panels read as glass instead of
+  washing into the sky; `--surface-dark-a` floor .16 → .20.
+- **Transparency slider defaults to Balanced (35)** — Ultra Clear remains
+  available but is no longer the out-of-box state (at 0, card text over
+  bright golden-hour bottoms cannot hold AA). Persisted choices win.
+- Surface text tokens lifted (`--surface-muted` .74 → .80, `--surface-faint`
+  .56 → .66 dark; .72 → .78 / .54 → .62 light); dock scrims retuned for the
+  ink/light dock treatment; the day sun parks at 34–58% left so its halo
+  no longer reads as an artifact bleeding through the sidebar glass.
+
 ## [4.0.0] — 2026-10-12
 
 Liquid Glass material overhaul — a full pass over the glass system driven

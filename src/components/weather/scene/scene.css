@@ -172,7 +172,7 @@
 }
 
 .scene-sun--horizon .scene-sun-halo {
-  background: radial-gradient(circle, rgb(255 200 140 / 0.42), rgb(255 190 120 / 0.12) 45%, transparent 70%);
+  background: radial-gradient(circle, rgb(255 200 140 / 0.34), rgb(255 190 120 / 0.1) 45%, transparent 70%);
 }
 
 /* Whisper-faint conic rays, masked to a soft disc, rotating over ~90s. */

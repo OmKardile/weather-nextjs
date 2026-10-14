@@ -137,7 +137,10 @@ export const usePreferences = create<PreferencesState>()(
       sectionOrder: [...DEFAULT_SECTION_ORDER],
       hiddenSections: [],
       density: 'comfortable',
-      glassTransparency: 0,
+      // Balanced by default (v4.1): Ultra-clear (0) is a deliberate choice —
+      // card text over bright golden-hour scene bottoms couldn't hold AA
+      // there. Users can still slide to 0; existing persisted choices win.
+      glassTransparency: 35,
       reduceBrightEffects: false,
       tiltGlowEnabled: false,
       skinType: 2,

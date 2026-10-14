@@ -6,7 +6,7 @@ export function SiteFooter() {
   return (
     /* Flat on the scene — no panel (the old .glass slab here read as a
        milky bar at the page bottom). A whisper hairline separates it. */
-    <footer className="mt-auto border-t border-[rgb(255_255_255/0.09)] pt-5 [data-surface='light']_&:border-[rgb(14_42_46/0.12)]">
+    <footer className="footer-hairline mt-auto pt-5">
       <div className="mx-auto w-full max-w-6xl px-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:px-6">
         <div className="flex flex-col items-center gap-3 text-center md:flex-row md:justify-between md:text-left">
           <p className="flex items-center gap-2 text-xs text-surface-muted">

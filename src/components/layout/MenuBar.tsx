@@ -76,8 +76,8 @@ function ClusterButton({
       aria-pressed={active}
       title={label}
       className={cn(
-        'focus-ring flex h-11 w-11 items-center justify-center rounded-full text-white transition-colors duration-200 disabled:opacity-60',
-        active && 'bg-white/16',
+        'focus-ring flex h-11 w-11 items-center justify-center rounded-full transition-colors duration-200 disabled:opacity-60',
+        active && 'ctl-active',
         className,
       )}
     >
@@ -212,8 +212,8 @@ export function MenuBar({
                   aria-pressed={active}
                   onClick={active ? undefined : onToggleUnits}
                   className={cn(
-                    'focus-ring tnum relative flex h-10 min-w-10 items-center justify-center rounded-full px-2 text-[13px] font-semibold transition-colors duration-200',
-                    active ? 'text-white' : 'text-white/70 hover:text-white',
+                    'focus-ring tnum relative flex h-10 min-w-10 items-center justify-center rounded-full px-2 text-[13px] font-semibold transition-opacity duration-200',
+                    active ? 'seg-active' : 'seg-idle',
                   )}
                 >
                   {active && (

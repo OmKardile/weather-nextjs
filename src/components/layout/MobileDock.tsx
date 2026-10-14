@@ -80,14 +80,14 @@ export function MobileDock({ active, onChange, className }: MobileDockProps) {
                   className={cn(
                     'relative transition-all duration-200 ease-[var(--ease-spring-bouncy)]',
                     isActive
-                      ? 'scale-110 text-white drop-shadow-[0_0_10px_rgb(255_255_255/0.45)]'
-                      : 'text-white/72 group-hover:text-white',
+                      ? 'dock-glow scale-110'
+                      : 'opacity-70 group-hover:opacity-100',
                   )}
                 />
                 <span
                   className={cn(
-                    'relative text-[11px] font-medium leading-none transition-colors duration-200',
-                    isActive ? 'text-white' : 'text-white/72 group-hover:text-white',
+                    'relative text-[11px] font-medium leading-none transition-opacity duration-200',
+                    isActive ? '' : 'opacity-70 group-hover:opacity-100',
                   )}
                 >
                   {item.label}

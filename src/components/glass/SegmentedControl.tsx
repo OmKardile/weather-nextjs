@@ -60,8 +60,8 @@ export function SegmentedControl<T extends string>({
             aria-pressed={active}
             onClick={active ? undefined : () => onChange(option.id)}
             className={cn(
-              'focus-ring relative z-10 h-7 rounded-full px-3 text-[12px] font-semibold transition-colors duration-200',
-              active ? 'text-white' : 'text-white/70 hover:text-white',
+              'focus-ring relative z-10 h-7 rounded-full px-3 text-[12px] font-semibold transition-opacity duration-200',
+              active ? 'seg-active' : 'seg-idle',
             )}
           >
             {active && (

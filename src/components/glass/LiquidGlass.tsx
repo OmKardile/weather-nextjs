@@ -116,12 +116,14 @@ export function useLiquidGlassVars(): CSSProperties {
     '--lg-refract': (1 - t * 0.75).toFixed(3),
     '--lg-rim': (1 - t * 0.65).toFixed(3),
     // Surface (content layer) — flatter, follows the same slider.
-    // Dark scenes tint DARK-teal translucent (.16 → .74): iOS dark
+    // Dark scenes tint DARK-teal translucent (.20 → .78): iOS dark
     // materials darken the scene behind cards; a white tint here is
-    // exactly the "milky grey slab" look. Light scenes keep white milk
+    // exactly the "milky grey slab" look. The floor moved .16 → .20 in
+    // v4.1 — at Ultra-clear the old floor let bright golden-hour mids
+    // read straight through the cards. Light scenes keep white milk
     // via --surface-tint-a ([data-surface='light'] variants).
     '--surface-tint-a': (0.08 + t * 0.32).toFixed(3),
-    '--surface-dark-a': (0.16 + t * 0.58).toFixed(3),
+    '--surface-dark-a': (0.2 + t * 0.58).toFixed(3),
   } as CSSProperties;
 }
 

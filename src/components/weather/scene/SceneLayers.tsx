@@ -146,7 +146,10 @@ function Sun({ phase, seed }: { phase: DayPhase; seed: string }) {
   const pos = useMemo(() => {
     const rand = mulberry32(hashString(`${seed}:sun`));
     if (horizon) return { horizon: true, offset: 22 + rand() * 8, left: 20 + rand() * 30 };
-    return { horizon: false, offset: 8 + rand() * 6, left: 10 + rand() * 18 };
+    // Day sun parks in the content column (34–58%) — the old 10–28% band
+    // sat exactly under the desktop CitiesSidebar, and its 45vmin halo
+    // read as a rendering artifact bleeding through the sidebar glass.
+    return { horizon: false, offset: 8 + rand() * 6, left: 34 + rand() * 24 };
   }, [seed, horizon]);
 
   const style: CSSProperties = pos.horizon

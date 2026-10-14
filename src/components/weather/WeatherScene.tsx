@@ -57,10 +57,6 @@ export function WeatherScene({ scene }: { scene: SceneConfig }) {
 
   return (
     <div aria-hidden="true" className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-      {/* Scene-aware legibility scrims — darken the sky (never the
-          content) so white hero text and the floating dock pass AA. */}
-      <div className="hero-scrim" />
-      <div className="dock-scrim" />
       {slots.map((slot) => {
         const { layers, gradient } = slot.scene;
         const precipitation = layers.rain !== 'none' || layers.snow;
@@ -82,6 +78,14 @@ export function WeatherScene({ scene }: { scene: SceneConfig }) {
           </div>
         );
       })}
+      {/* Scene-aware legibility scrims — darken the sky (never the
+          content) so white hero text and the floating dock pass AA.
+          v4.1 BUG FIX: these must render AFTER the scene slots — painted
+          first (as before) the gradient covered them and the scrims were
+          dead code, leaving white hero text at ~1.3:1 on light day
+          scenes. DOM order wins (same stacking context, no z-index). */}
+      <div className="hero-scrim" />
+      <div className="dock-scrim" />
     </div>
   );
 }
